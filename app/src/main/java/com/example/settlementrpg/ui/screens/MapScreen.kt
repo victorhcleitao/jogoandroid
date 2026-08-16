@@ -358,6 +358,31 @@ fun drawIsoTavern(scope: DrawScope, centerX: Float, centerY: Float, scale: Float
     drawIsoPyramid(scope, pos.x, pos.y - 22f * scale, 16f * scale, 12f * scale, Color(0xFFB71C1C), Color(0xFFE53935))
 }
 
+// --- DESENHAR MERCADOR PROCEDURAL ---
+fun drawIsoMerchant(scope: DrawScope, centerX: Float, centerY: Float, scale: Float, level: Int) {
+    val woodLeft = Color(0xFF5D4037)
+    val woodRight = Color(0xFF6D4C41)
+    val woodTop = Color(0xFF8D6E63)
+    val tentLeft = Color(0xFF0D47A1)
+    val tentRight = Color(0xFF1976D2)
+    
+    val pos = toIsometric(350f, 330f, centerX, centerY, scale)
+    
+    // Caixa base (balcão de madeira)
+    drawIsoBox(scope, pos.x, pos.y, 14f * scale, 16f * scale, woodLeft, woodRight, woodTop)
+    
+    // Toldo / cobertura da tenda (pirâmide azul acima do balcão)
+    drawIsoPyramid(scope, pos.x, pos.y - 16f * scale, 15f * scale, 12f * scale, tentLeft, tentRight)
+    
+    // Moeda dourada flutuante
+    val coinY = pos.y - 32f * scale
+    scope.drawCircle(
+        color = Color(0xFFFFD54F),
+        radius = 2.5f * scale,
+        center = Offset(pos.x, coinY)
+    )
+}
+
 // --- DESENHAR BITMAP SLICE (PNG SPRITES SHEET) ---
 fun DrawScope.drawIsoSpriteBitmap(
     bitmap: ImageBitmap,
@@ -368,31 +393,36 @@ fun DrawScope.drawIsoSpriteBitmap(
     animIndex: Int = 0,
     flashActive: Boolean = false,
     sizeMultiplier: Float = 1.15f
-) {
-    val totalFrames = max(1, bitmap.width / frameWidth)
-    val currentFrame = animIndex % totalFrames
-    
-    val destW = 38f * scale * sizeMultiplier
-    val destH = 38f * scale * sizeMultiplier
-    
-    val dstX = center.x - destW / 2
-    val dstY = center.y - destH / 2
-    
-    val colorFilter = if (flashActive) {
-        androidx.compose.ui.graphics.ColorFilter.tint(Color(0xFFC62828), androidx.compose.ui.graphics.BlendMode.SrcAtop)
-    } else {
-        null
+): Boolean {
+    return try {
+        val totalFrames = max(1, bitmap.width / frameWidth)
+        val currentFrame = animIndex % totalFrames
+        
+        val destW = 38f * scale * sizeMultiplier
+        val destH = 38f * scale * sizeMultiplier
+        
+        val dstX = center.x - destW / 2
+        val dstY = center.y - destH / 2
+        
+        val colorFilter = if (flashActive) {
+            androidx.compose.ui.graphics.ColorFilter.tint(Color(0xFFC62828), androidx.compose.ui.graphics.BlendMode.SrcAtop)
+        } else {
+            null
+        }
+        
+        drawImage(
+            image = bitmap,
+            srcOffset = androidx.compose.ui.unit.IntOffset(currentFrame * frameWidth, 0),
+            srcSize = androidx.compose.ui.unit.IntSize(frameWidth, frameHeight),
+            dstOffset = androidx.compose.ui.unit.IntOffset(dstX.toInt(), dstY.toInt()),
+            dstSize = androidx.compose.ui.unit.IntSize(destW.toInt(), destH.toInt()),
+            filterQuality = androidx.compose.ui.graphics.FilterQuality.None,
+            colorFilter = colorFilter
+        )
+        true
+    } catch (e: Exception) {
+        false
     }
-    
-    drawImage(
-        image = bitmap,
-        srcOffset = androidx.compose.ui.unit.IntOffset(currentFrame * frameWidth, 0),
-        srcSize = androidx.compose.ui.unit.IntSize(frameWidth, frameHeight),
-        dstOffset = androidx.compose.ui.unit.IntOffset(dstX.toInt(), dstY.toInt()),
-        dstSize = androidx.compose.ui.unit.IntSize(destW.toInt(), destH.toInt()),
-        filterQuality = androidx.compose.ui.graphics.FilterQuality.None,
-        colorFilter = colorFilter
-    )
 }
 
 // --- RENDERIZADORES COM FALLBACK SE BITMAP NULO ---
@@ -413,7 +443,7 @@ fun DrawScope.drawHeroSprite(
             else -> warriorIdle
         }
         if (bitmap != null) {
-            drawIsoSpriteBitmap(
+            val success = drawIsoSpriteBitmap(
                 bitmap = bitmap,
                 center = center,
                 scale = scale,
@@ -423,7 +453,7 @@ fun DrawScope.drawHeroSprite(
                 flashActive = hero.flashTicks > 0,
                 sizeMultiplier = 3.2f
             )
-            return
+            if (success) return
         }
     }
     
@@ -472,7 +502,7 @@ fun DrawScope.drawMonsterSprite(
             else -> orcIdle
         }
         if (bitmap != null) {
-            drawIsoSpriteBitmap(
+            val success = drawIsoSpriteBitmap(
                 bitmap = bitmap,
                 center = center,
                 scale = scale,
@@ -482,7 +512,7 @@ fun DrawScope.drawMonsterSprite(
                 flashActive = monster.flashTicks > 0,
                 sizeMultiplier = 3.2f
             )
-            return
+            if (success) return
         }
     }
 
@@ -531,6 +561,8 @@ sealed class IsoDrawable(val x: Float, val y: Float) {
     class BlacksmithItem : IsoDrawable(250f, 330f)
     
     class TavernItem : IsoDrawable(350f, 270f)
+    
+    class MerchantItem : IsoDrawable(350f, 330f)
 
     class DecorItem(val decorX: Float, val decorY: Float, val type: String) : IsoDrawable(decorX, decorY)
 
@@ -794,9 +826,11 @@ fun MapScreen(
                         val guildLvl = gameState.buildings.find { it.id == "guild" }?.level ?: 1
                         val blacksmithLvl = gameState.buildings.find { it.id == "blacksmith" }?.level ?: 0
                         val tavernLvl = gameState.buildings.find { it.id == "tavern" }?.level ?: 0
+                        val merchantLvl = gameState.buildings.find { it.id == "merchant" }?.level ?: 0
                         
                         if (blacksmithLvl > 0) drawables.add(IsoDrawable.BlacksmithItem())
                         if (tavernLvl > 0) drawables.add(IsoDrawable.TavernItem())
+                        if (merchantLvl > 0) drawables.add(IsoDrawable.MerchantItem())
                         
                         // Elementos decorativos (árvores e rochas)
                         val activeDecors = decors.toMutableList()
@@ -854,6 +888,29 @@ fun MapScreen(
                         
                         drawables.sortBy { it.depth }
 
+                        val occupiedLabels = mutableListOf<androidx.compose.ui.geometry.Rect>()
+                        
+                        fun adjustForCollisions(initialRect: androidx.compose.ui.geometry.Rect): androidx.compose.ui.geometry.Rect {
+                            var current = initialRect
+                            var collided = true
+                            var attempts = 0
+                            while (collided && attempts < 15) {
+                                collided = false
+                                for (occupied in occupiedLabels) {
+                                    if (current.left < occupied.right && current.right > occupied.left &&
+                                        current.top < occupied.bottom && current.bottom > occupied.top) {
+                                        // Colisão detectada! Desloca verticalmente para cima
+                                        val shiftY = occupied.top - current.bottom - 4f * scale
+                                        current = current.translate(0f, shiftY)
+                                        collided = true
+                                        break
+                                    }
+                                }
+                                attempts++
+                            }
+                            return current
+                        }
+
                         // 8. Renderização na Ordem Z Correta
                         drawables.forEach { drawable ->
                             val isoPos = toIsometric(drawable.x, drawable.y, guildX, guildY, scale)
@@ -864,7 +921,8 @@ fun MapScreen(
                                     
                                     val guildLayout = textMeasurer.measure(
                                         text = "Guilda Lvl $guildLvl",
-                                        style = TextStyle(color = GoldPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        style = TextStyle(color = GoldPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                                        softWrap = false
                                     )
                                     val guildWidth = guildLayout.size.width.toFloat()
                                     val guildHeight = guildLayout.size.height.toFloat()
@@ -874,10 +932,24 @@ fun MapScreen(
                                         else -> guildY - 85f * scale
                                     }
                                     
+                                    val guildLabelWidth = guildWidth + 12f * scale
+                                    val guildLabelHeight = guildHeight + 6f * scale
+                                    val guildLabelX = guildX - guildWidth / 2 - 6f * scale
+                                    val guildLabelY = textY - 3f * scale
+                                    
+                                    // Castelo é desenhado e seu label é registrado no occupiedLabels
+                                    val guildRect = androidx.compose.ui.geometry.Rect(
+                                        guildLabelX,
+                                        guildLabelY,
+                                        guildLabelX + guildLabelWidth,
+                                        guildLabelY + guildLabelHeight
+                                    )
+                                    occupiedLabels.add(guildRect)
+                                    
                                     drawRoundRect(
                                         color = Color.Black.copy(alpha = 0.7f),
-                                        topLeft = Offset(guildX - guildWidth / 2 - 6f * scale, textY - 3f * scale),
-                                        size = androidx.compose.ui.geometry.Size(guildWidth + 12f * scale, guildHeight + 6f * scale),
+                                        topLeft = Offset(guildLabelX, guildLabelY),
+                                        size = androidx.compose.ui.geometry.Size(guildLabelWidth, guildLabelHeight),
                                         cornerRadius = androidx.compose.ui.geometry.CornerRadius(4f * scale)
                                     )
                                     
@@ -900,6 +972,15 @@ fun MapScreen(
                                     drawText(
                                         textMeasurer = textMeasurer,
                                         text = "Taberna Lvl $tavernLvl",
+                                        style = TextStyle(color = TextWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center),
+                                        topLeft = Offset(isoPos.x - 22f * scale, isoPos.y + 4f * scale)
+                                    )
+                                }
+                                is IsoDrawable.MerchantItem -> {
+                                    drawIsoMerchant(this, guildX, guildY, scale, merchantLvl)
+                                    drawText(
+                                        textMeasurer = textMeasurer,
+                                        text = "Mercador Lvl $merchantLvl",
                                         style = TextStyle(color = TextWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center),
                                         topLeft = Offset(isoPos.x - 22f * scale, isoPos.y + 4f * scale)
                                     )
@@ -953,26 +1034,16 @@ fun MapScreen(
                                                 radius = 12f * scale,
                                                 center = isoPos
                                             )
-                                            val bmp = campfire1
-                                            if (bmp != null) {
-                                                drawIsoSpriteBitmap(
-                                                    bitmap = bmp,
-                                                    center = Offset(isoPos.x, isoPos.y - 12f * scale),
-                                                    scale = scale,
-                                                    frameWidth = 64,
-                                                    frameHeight = 64,
-                                                    animIndex = frameIndex,
-                                                    sizeMultiplier = 1.3f
-                                                )
-                                            } else {
-                                                val torchColors = mapOf('F' to Color(0xFFFF9100), 'S' to Color(0xFF5D4037))
-                                                drawPixelSprite(
-                                                    sprite = torchSprite,
-                                                    colorMap = torchColors,
-                                                    center = Offset(isoPos.x, isoPos.y - 10f * scale),
-                                                    pixelSize = 2.5f * scale
-                                                )
-                                            }
+                                            // Substitui o asset grande de fogueira por tochas procedurais com micro-animação
+                                            // Alterna as cores da chama (F) entre amarelo e laranja baseando-se no frameIndex para tremular
+                                            val flameColor = if (frameIndex % 2 == 0) Color(0xFFFF9100) else Color(0xFFFFD54F)
+                                            val torchColors = mapOf('F' to flameColor, 'S' to Color(0xFF5D4037))
+                                            drawPixelSprite(
+                                                sprite = torchSprite,
+                                                colorMap = torchColors,
+                                                center = Offset(isoPos.x, isoPos.y - 10f * scale),
+                                                pixelSize = 2.2f * scale
+                                            )
                                         }
                                     }
                                 }
@@ -1031,23 +1102,38 @@ fun MapScreen(
 
                                     val nameLayout = textMeasurer.measure(
                                         text = hero.name,
-                                        style = TextStyle(color = TextWhite, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                        style = TextStyle(color = TextWhite, fontSize = 8.sp, fontWeight = FontWeight.Bold),
+                                        softWrap = false
                                     )
                                     val nameWidth = nameLayout.size.width.toFloat()
                                     val nameHeight = nameLayout.size.height.toFloat()
                                     val rectX = isoPos.x - nameWidth / 2 - 4f * scale
                                     val rectY = spriteY - 26f * scale
                                     
+                                    val heroRectWidth = nameWidth + 8f * scale
+                                    val heroRectHeight = nameHeight + 4f * scale
+                                    val rawHeroRect = androidx.compose.ui.geometry.Rect(
+                                        rectX,
+                                        rectY - 2f * scale,
+                                        rectX + heroRectWidth,
+                                        rectY - 2f * scale + heroRectHeight
+                                    )
+                                    val adjustedHeroRect = adjustForCollisions(rawHeroRect)
+                                    occupiedLabels.add(adjustedHeroRect)
+                                    
+                                    val finalRectX = adjustedHeroRect.left
+                                    val finalRectY = adjustedHeroRect.top + 2f * scale
+                                    
                                     drawRoundRect(
                                         color = Color.Black.copy(alpha = 0.6f),
-                                        topLeft = Offset(rectX, rectY - 2f * scale),
-                                        size = androidx.compose.ui.geometry.Size(nameWidth + 8f * scale, nameHeight + 4f * scale),
+                                        topLeft = Offset(finalRectX, finalRectY - 2f * scale),
+                                        size = androidx.compose.ui.geometry.Size(heroRectWidth, heroRectHeight),
                                         cornerRadius = androidx.compose.ui.geometry.CornerRadius(4f * scale)
                                     )
                                     
                                     drawText(
                                         textLayoutResult = nameLayout,
-                                        topLeft = Offset(isoPos.x - nameWidth / 2, rectY)
+                                        topLeft = Offset(finalRectX + 4f * scale, finalRectY)
                                     )
                                 }
                                 is IsoDrawable.MonsterItem -> {
@@ -1097,23 +1183,38 @@ fun MapScreen(
 
                                         val nameLayout = textMeasurer.measure(
                                             text = monster.name.substringBefore(" "),
-                                            style = TextStyle(color = TextWhite, fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
+                                            style = TextStyle(color = TextWhite, fontSize = 8.sp, fontWeight = FontWeight.SemiBold),
+                                            softWrap = false
                                         )
                                         val nameWidth = nameLayout.size.width.toFloat()
                                         val nameHeight = nameLayout.size.height.toFloat()
                                         val rectX = isoPos.x - nameWidth / 2 - 4f * scale
                                         val rectY = barY - 12f * scale
                                         
+                                        val monsterRectWidth = nameWidth + 8f * scale
+                                        val monsterRectHeight = nameHeight + 4f * scale
+                                        val rawMonsterRect = androidx.compose.ui.geometry.Rect(
+                                            rectX,
+                                            rectY - 2f * scale,
+                                            rectX + monsterRectWidth,
+                                            rectY - 2f * scale + monsterRectHeight
+                                        )
+                                        val adjustedMonsterRect = adjustForCollisions(rawMonsterRect)
+                                        occupiedLabels.add(adjustedMonsterRect)
+                                        
+                                        val finalMonsterRectX = adjustedMonsterRect.left
+                                        val finalMonsterRectY = adjustedMonsterRect.top + 2f * scale
+                                        
                                         drawRoundRect(
                                             color = Color.Black.copy(alpha = 0.6f),
-                                            topLeft = Offset(rectX, rectY - 2f * scale),
-                                            size = androidx.compose.ui.geometry.Size(nameWidth + 8f * scale, nameHeight + 4f * scale),
+                                            topLeft = Offset(finalMonsterRectX, finalMonsterRectY - 2f * scale),
+                                            size = androidx.compose.ui.geometry.Size(monsterRectWidth, monsterRectHeight),
                                             cornerRadius = androidx.compose.ui.geometry.CornerRadius(4f * scale)
                                         )
                                         
                                         drawText(
                                             textLayoutResult = nameLayout,
-                                            topLeft = Offset(isoPos.x - nameWidth / 2, rectY)
+                                            topLeft = Offset(finalMonsterRectX + 4f * scale, finalMonsterRectY)
                                         )
                                     }
                                 }

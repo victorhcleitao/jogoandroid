@@ -108,6 +108,8 @@ fun MainScreen(
                     onUpgradeBuilding = { viewModel.upgradeBuilding(it) },
                     onPublishMission = { viewModel.publishMission(it) },
                     onSellMaterial = { viewModel.sellMaterialFromGuild(it) },
+                    onCraftEquipment = { viewModel.craftEquipment(it) },
+                    onEquipHero = { heroId, equipId -> viewModel.equipHero(heroId, equipId) },
                     modifier = Modifier.fillMaxSize()
                 )
                 2 -> LogScreen(logs = gameState.logs, modifier = Modifier.fillMaxSize())

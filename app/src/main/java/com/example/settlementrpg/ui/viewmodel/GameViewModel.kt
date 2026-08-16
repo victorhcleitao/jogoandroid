@@ -23,6 +23,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     val gameState: StateFlow<GameState> = _gameState.asStateFlow()
 
     private var gameLoopJob: Job? = null
+    private var tickCounter = 0
     
     // Contagem regressiva para respawn de monstros: monsterId -> ticks restantes
     private val monsterRespawns = mutableMapOf<String, Int>()
@@ -92,10 +93,34 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     @Synchronized
     private fun tick() {
+        tickCounter++
         val currentState = _gameState.value
         val newFloatingTexts = mutableListOf<FloatingText>()
         val currentMaterialsMap = currentState.materials.toMutableMap()
         val logsToAdd = mutableListOf<LogMessage>()
+        
+        // Lógica do Mercador (Automação de Venda Passiva)
+        val merchant = currentState.buildings.find { it.id == "merchant" }
+        if (merchant != null && merchant.isBuilt) {
+            val secondsInterval = max(1, 6 - merchant.level)
+            if (tickCounter % secondsInterval == 0) {
+                val sellableMats = currentMaterialsMap.filter { it.key != "gold_loot" && it.value > 0 }.keys.toList()
+                if (sellableMats.isNotEmpty()) {
+                    val matToSell = sellableMats[Random.nextInt(sellableMats.size)]
+                    currentMaterialsMap[matToSell] = currentMaterialsMap[matToSell]!! - 1
+                    val value = getMaterialSellValue(matToSell)
+                    addGuildGold(value)
+                    logsToAdd.add(LogMessage(
+                        id = UUID.randomUUID().toString(),
+                        text = "Mercador: Vendeu automaticamente 1x ${getMaterialDisplayName(matToSell)} por $value 🪙.",
+                        timestamp = System.currentTimeMillis(),
+                        type = LogType.GUILD
+                    ))
+                }
+            }
+        }
+
+        val monstersList = currentState.monsters.toMutableList()
         
         val updatedHeroes = currentState.heroes.map { hero ->
             var updatedHero = hero.copy(prevX = hero.x, prevY = hero.y)
@@ -124,6 +149,28 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             // 2. Movimentação
+            if (updatedHero.state == HeroState.WALKING_TO_MONSTER) {
+                val monster = monstersList.find { it.id == updatedHero.targetMonsterId }
+                if (monster == null || monster.isDead) {
+                    logsToAdd.add(LogMessage(
+                        id = UUID.randomUUID().toString(),
+                        text = "Aviso: O alvo de ${updatedHero.name} foi derrotado. Retornando à guilda.",
+                        timestamp = System.currentTimeMillis(),
+                        type = LogType.GUILD
+                    ))
+                    if (updatedHero.currentMissionId != null) {
+                        releaseMission(updatedHero.currentMissionId!!)
+                    }
+                    updatedHero = updatedHero.copy(
+                        state = HeroState.WALKING_TO_GUILD,
+                        targetX = 300f,
+                        targetY = 300f,
+                        targetMonsterId = null,
+                        currentMissionId = null
+                    )
+                }
+            }
+
             if (updatedHero.state == HeroState.WALKING_TO_MONSTER || updatedHero.state == HeroState.WALKING_TO_GUILD) {
                 val dx = updatedHero.targetX - updatedHero.x
                 val dy = updatedHero.targetY - updatedHero.y
@@ -166,7 +213,6 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }.toMutableList()
 
         // 3. Processamento de Combate
-        val monstersList = currentState.monsters.toMutableList()
         val completedMissions = mutableListOf<String>()
         val hasBlacksmith = currentState.buildings.find { it.id == "blacksmith" }?.isBuilt == true
 
@@ -177,6 +223,29 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 if (monsterIndex != -1) {
                     val monster = monstersList[monsterIndex]
                     if (!monster.isDead) {
+                        // Validar distância de combate física (evitar combate fantasma)
+                        val dx = monster.x - hero.x
+                        val dy = monster.y - hero.y
+                        val dist = sqrt(dx * dx + dy * dy)
+                        if (dist > 35f) {
+                            logsToAdd.add(LogMessage(
+                                id = UUID.randomUUID().toString(),
+                                text = "Aviso: ${hero.name} perdeu o alvo de vista. Retornando à guilda.",
+                                timestamp = System.currentTimeMillis(),
+                                type = LogType.GUILD
+                            ))
+                            if (hero.currentMissionId != null) {
+                                releaseMission(hero.currentMissionId)
+                            }
+                            updatedHeroes[i] = hero.copy(
+                                state = HeroState.WALKING_TO_GUILD,
+                                targetX = 300f,
+                                targetY = 300f,
+                                targetMonsterId = null,
+                                currentMissionId = null
+                            )
+                            continue
+                        }
                         // Bônus de ataque da Ferraria
                         val heroAtk = if (hasBlacksmith) hero.attack * 1.15f else hero.attack
                         
@@ -225,6 +294,31 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                                         type = LogType.COMBAT
                                     ))
                                 }
+                            }
+
+                            // Sorteio de Ouro Adicional (35% de chance, entre 2 e 10g)
+                            if (Random.nextFloat() <= 0.35f) {
+                                val goldAmount = Random.nextInt(2, 11)
+                                collected["gold_loot"] = (collected["gold_loot"] ?: 0) + goldAmount
+                                logsToAdd.add(LogMessage(
+                                    id = UUID.randomUUID().toString(),
+                                    text = "Ouro adicional encontrado: +$goldAmount 🪙",
+                                    timestamp = System.currentTimeMillis(),
+                                    type = LogType.COMBAT
+                                ))
+                            }
+
+                            // Sorteio de Sucatas/Equipamentos Básicos (25% de chance)
+                            if (Random.nextFloat() <= 0.25f) {
+                                val itemOptions = listOf("rusty_sword", "broken_shield", "old_ring", "gold_nugget")
+                                val rolledItem = itemOptions[Random.nextInt(itemOptions.size)]
+                                collected[rolledItem] = (collected[rolledItem] ?: 0) + 1
+                                logsToAdd.add(LogMessage(
+                                    id = UUID.randomUUID().toString(),
+                                    text = "Equipamento/Sucata obtida: +1 ${getMaterialDisplayName(rolledItem)}",
+                                    timestamp = System.currentTimeMillis(),
+                                    type = LogType.COMBAT
+                                ))
                             }
 
                             // Recompensas: Apenas XP e Loot (materiais), sem ouro direto!
@@ -377,7 +471,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 if (availableMission != null) {
                     // Encontrar monstro alvo correspondente no mapa
                     val monster = monstersList.find { it.name.startsWith(availableMission.targetMonsterName) && !it.isDead }
-                    if (monster != null) {
+                    val isMonsterTargeted = updatedHeroes.any { it.targetMonsterId == monster?.id }
+                    if (monster != null && !isMonsterTargeted) {
                         // Atribuir missão ao herói
                         val missionIndex = updatedMissions.indexOfFirst { it.id == availableMission.id }
                         updatedMissions[missionIndex] = availableMission.copy(assignedHeroId = hero.id)
@@ -424,7 +519,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             monsters = updatedMonsters,
             missions = updatedMissions,
             logs = combinedLogs,
-            gold = currentState.gold,
+            gold = _gameState.value.gold,
             materials = currentMaterialsMap,
             reputation = currentState.reputation + repGained,
             floatingTexts = updatedFloatingTexts,
@@ -469,8 +564,23 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         logsToAdd: MutableList<LogMessage>
     ): Hero {
         // 1. Receber os materiais trazidos pelo herói e armazenar no armazém da guilda
+        var additionalGold = 0
         hero.collectedMaterials.forEach { (mat, amt) ->
-            currentMats[mat] = (currentMats[mat] ?: 0) + amt
+            if (mat == "gold_loot") {
+                additionalGold += amt
+            } else {
+                currentMats[mat] = (currentMats[mat] ?: 0) + amt
+            }
+        }
+
+        if (additionalGold > 0) {
+            addGuildGold(additionalGold)
+            logsToAdd.add(LogMessage(
+                id = UUID.randomUUID().toString(),
+                text = "Entrega: ${hero.name} depositou +$additionalGold 🪙 adicionais de ouro saqueado de monstros no cofre da guilda.",
+                timestamp = System.currentTimeMillis(),
+                type = LogType.GUILD
+            ))
         }
 
         // 2. Obter a recompensa contratada da missão correspondente
@@ -560,14 +670,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 updatedHeroesList.add(robin)
                 
-                // Desbloquear Ferraria na lista
+                // Desbloquear Ferraria e Mercador na lista
                 val blacksmithIndex = updatedBuildingsList.indexOfFirst { it.id == "blacksmith" }
                 if (blacksmithIndex != -1) {
                     updatedBuildingsList[blacksmithIndex] = updatedBuildingsList[blacksmithIndex].copy(isUnlocked = true)
                 }
+                val merchantIndex = updatedBuildingsList.indexOfFirst { it.id == "merchant" }
+                if (merchantIndex != -1) {
+                    updatedBuildingsList[merchantIndex] = updatedBuildingsList[merchantIndex].copy(isUnlocked = true)
+                }
                 
                 logsToAdd.add(LogMessage(UUID.randomUUID().toString(), "Novo herói errante atraído pela Guilda Lvl 2: Robin (Arqueiro)!", System.currentTimeMillis(), LogType.GUILD))
-                logsToAdd.add(LogMessage(UUID.randomUUID().toString(), "Estrutura Liberada para Construção: Ferraria!", System.currentTimeMillis(), LogType.UPGRADE))
+                logsToAdd.add(LogMessage(UUID.randomUUID().toString(), "Estruturas Liberadas para Construção: Ferraria e Mercador!", System.currentTimeMillis(), LogType.UPGRADE))
             } else if (guildLvl == 3) {
                 // Desbloqueia Taberna e atrai Clériga Elena
                 val elena = Hero(
@@ -633,19 +747,172 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     fun sellMaterialFromGuild(materialId: String, amount: Int = 1) {
         val currentState = _gameState.value
-        val owned = currentState.materials[materialId] ?: 0
-        if (owned < amount) return
+        val isEquipment = materialId in listOf("slime_sword", "wolf_armor", "power_ring")
         
-        val valueGained = getMaterialSellValue(materialId) * amount
-        val updatedMats = currentState.materials.toMutableMap()
-        updatedMats[materialId] = owned - amount
-        
-        _gameState.value = currentState.copy(
-            gold = currentState.gold + valueGained,
-            materials = updatedMats
+        if (isEquipment) {
+            val owned = currentState.equipments[materialId] ?: 0
+            if (owned < amount) return
+            
+            val valueGained = getMaterialSellValue(materialId) * amount
+            val updatedEquips = currentState.equipments.toMutableMap()
+            updatedEquips[materialId] = owned - amount
+            
+            _gameState.value = currentState.copy(
+                gold = currentState.gold + valueGained,
+                equipments = updatedEquips
+            )
+            addLog("Venda: Guilda vendeu ${amount}x ${getMaterialDisplayName(materialId)} por +$valueGained 🪙.", LogType.GUILD)
+        } else {
+            val owned = currentState.materials[materialId] ?: 0
+            if (owned < amount) return
+            
+            val valueGained = getMaterialSellValue(materialId) * amount
+            val updatedMats = currentState.materials.toMutableMap()
+            updatedMats[materialId] = owned - amount
+            
+            _gameState.value = currentState.copy(
+                gold = currentState.gold + valueGained,
+                materials = updatedMats
+            )
+            addLog("Venda: Guilda vendeu ${amount}x ${getMaterialDisplayName(materialId)} por +$valueGained 🪙.", LogType.GUILD)
+        }
+        saveGame()
+    }
+
+    fun craftEquipment(recipeId: String) {
+        val currentState = _gameState.value
+        val recipes = mapOf(
+            "slime_sword" to (mapOf("slime_gel" to 5, "iron_ore" to 1) to 10),
+            "wolf_armor" to (mapOf("wolf_fur" to 4, "goblin_ear" to 2) to 15),
+            "power_ring" to (mapOf("old_ring" to 1, "gold_nugget" to 1) to 25)
         )
         
-        addLog("Venda: Guilda vendeu ${amount}x ${getMaterialDisplayName(materialId)} por +$valueGained 🪙.", LogType.GUILD)
+        val recipe = recipes[recipeId] ?: return
+        val (matsNeeded, goldCost) = recipe
+        
+        if (currentState.gold < goldCost) {
+            addLog("Ouro insuficiente para fabricar ${getMaterialDisplayName(recipeId)} (Custo: $goldCost).", LogType.SYSTEM)
+            return
+        }
+        
+        for ((mat, amt) in matsNeeded) {
+            val owned = currentState.materials[mat] ?: 0
+            if (owned < amt) {
+                addLog("Material insuficiente para fabricar ${getMaterialDisplayName(recipeId)} (Necessário: $amt ${getMaterialDisplayName(mat)}).", LogType.SYSTEM)
+                return
+            }
+        }
+        
+        val updatedMats = currentState.materials.toMutableMap()
+        matsNeeded.forEach { (mat, amt) ->
+            updatedMats[mat] = updatedMats[mat]!! - amt
+        }
+        
+        val updatedEquips = currentState.equipments.toMutableMap()
+        updatedEquips[recipeId] = (updatedEquips[recipeId] ?: 0) + 1
+        
+        _gameState.value = currentState.copy(
+            gold = currentState.gold - goldCost,
+            materials = updatedMats,
+            equipments = updatedEquips
+        )
+        
+        addLog("Oficina: Fabricou 1x ${getMaterialDisplayName(recipeId)} com sucesso!", LogType.GUILD)
+        saveGame()
+    }
+
+    fun equipHero(heroId: String, equipmentId: String) {
+        val currentState = _gameState.value
+        val heroIndex = currentState.heroes.indexOfFirst { it.id == heroId }
+        if (heroIndex == -1) return
+        val hero = currentState.heroes[heroIndex]
+        
+        val owned = currentState.equipments[equipmentId] ?: 0
+        if (owned <= 0) return
+        
+        val updatedEquips = currentState.equipments.toMutableMap()
+        // Consome 1 item do estoque
+        updatedEquips[equipmentId] = owned - 1
+        
+        var updatedHero = hero
+        
+        // 1. Slot de Arma (Espada de Slime ou Anel do Poder)
+        if (equipmentId == "slime_sword" || equipmentId == "power_ring") {
+            val oldWeapon = hero.weaponName
+            if (oldWeapon == "Espada de Slime") {
+                updatedEquips["slime_sword"] = (updatedEquips["slime_sword"] ?: 0) + 1
+                val oldAtkBonus = when (hero.heroClass) {
+                    HeroClass.WARRIOR -> 12f
+                    HeroClass.ARCHER -> 8f
+                    else -> 4f
+                }
+                updatedHero = updatedHero.copy(attack = max(5f, updatedHero.attack - oldAtkBonus))
+            } else if (oldWeapon == "Anel do Poder") {
+                updatedEquips["power_ring"] = (updatedEquips["power_ring"] ?: 0) + 1
+                val isPreferred = hero.heroClass == HeroClass.MAGE || hero.heroClass == HeroClass.CLERIG
+                val oldAtkBonus = if (isPreferred) 15f else 8f
+                val oldHpBonus = if (isPreferred) 40f else 20f
+                updatedHero = updatedHero.copy(
+                    attack = max(5f, updatedHero.attack - oldAtkBonus),
+                    maxHp = max(50f, updatedHero.maxHp - oldHpBonus),
+                    hp = min(updatedHero.hp, max(10f, updatedHero.hp - oldHpBonus))
+                )
+            }
+            
+            if (equipmentId == "slime_sword") {
+                val atkBonus = when (hero.heroClass) {
+                    HeroClass.WARRIOR -> 12f
+                    HeroClass.ARCHER -> 8f
+                    else -> 4f
+                }
+                updatedHero = updatedHero.copy(
+                    weaponName = "Espada de Slime",
+                    attack = updatedHero.attack + atkBonus
+                )
+            } else if (equipmentId == "power_ring") {
+                val isPreferred = hero.heroClass == HeroClass.MAGE || hero.heroClass == HeroClass.CLERIG
+                val atkBonus = if (isPreferred) 15f else 8f
+                val hpBonus = if (isPreferred) 40f else 20f
+                updatedHero = updatedHero.copy(
+                    weaponName = "Anel do Poder",
+                    attack = updatedHero.attack + atkBonus,
+                    maxHp = updatedHero.maxHp + hpBonus,
+                    hp = updatedHero.hp + hpBonus
+                )
+            }
+        }
+        
+        // 2. Slot de Armadura (Armadura de Pele de Lobo)
+        if (equipmentId == "wolf_armor") {
+            val oldArmor = hero.armorName
+            if (oldArmor == "Armadura de Pele de Lobo") {
+                updatedEquips["wolf_armor"] = (updatedEquips["wolf_armor"] ?: 0) + 1
+                val oldDefBonus = when (hero.heroClass) {
+                    HeroClass.WARRIOR, HeroClass.ARCHER -> 12f
+                    else -> 6f
+                }
+                updatedHero = updatedHero.copy(defense = max(2f, updatedHero.defense - oldDefBonus))
+            }
+            
+            val defBonus = when (hero.heroClass) {
+                HeroClass.WARRIOR, HeroClass.ARCHER -> 12f
+                else -> 6f
+            }
+            updatedHero = updatedHero.copy(
+                armorName = "Armadura de Pele de Lobo",
+                defense = updatedHero.defense + defBonus
+            )
+        }
+        
+        val updatedHeroesList = currentState.heroes.toMutableList()
+        updatedHeroesList[heroIndex] = updatedHero
+        
+        _gameState.value = currentState.copy(
+            heroes = updatedHeroesList,
+            equipments = updatedEquips
+        )
+        
+        addLog("${hero.name} equipou ${getMaterialDisplayName(equipmentId)} da Oficina com bônus de Especialidade!", LogType.GUILD)
         saveGame()
     }
 
@@ -655,23 +922,24 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         
         if (monster == null) {
             return when {
-                prefix.startsWith("Slime") -> 2
+                prefix.startsWith("Slime") -> 1
                 prefix.startsWith("Lobo") -> 3
                 prefix.startsWith("Goblin") -> 5
                 prefix.startsWith("Orc") -> 11
-                else -> 2
+                else -> 1
             }
         }
         
         var expectedValue = 0f
         monster.lootTable.forEach { drop ->
             val sellValue = getMaterialSellValue(drop.materialId)
-            expectedValue += drop.chance * sellValue
+            val avgAmount = (drop.minAmount + drop.maxAmount) / 2.0f
+            expectedValue += drop.chance * avgAmount * sellValue
         }
         
-        val fraction = if (monster.level == 1) 0.75f else 0.65f
+        val fraction = if (monster.level == 1) 0.55f else 0.60f
         val reward = Math.round(expectedValue * fraction)
-        return max(2, reward)
+        return max(1, reward)
     }
 
     private fun generateRandomMission(guildLvl: Int): Mission {
@@ -683,7 +951,13 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         )
         // Dificuldade máxima baseada no nível da Guilda
         val maxDiff = min(targets.size, guildLvl)
-        val selected = targets[Random.nextInt(0, maxDiff)]
+        
+        // Se o ouro da guilda for muito baixo, força a geração de missões iniciantes mais baratas (Slime Silvestre)
+        val selected = if (_gameState.value.gold < 10) {
+            targets[0]
+        } else {
+            targets[Random.nextInt(0, maxDiff)]
+        }
 
         val titles = listOf(
             "Caça ao ${selected.first}",
@@ -710,6 +984,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         "goblin_ear" -> "Orelha de Goblin"
         "iron_ore" -> "Minério de Ferro"
         "orc_tooth" -> "Dente de Orc"
+        "rusty_sword" -> "Espada Enferrujada"
+        "broken_shield" -> "Escudo Quebrado"
+        "old_ring" -> "Anel Antigo"
+        "gold_nugget" -> "Pepita de Ouro"
+        "gold_loot" -> "Ouro Coletado"
         else -> matId.replace("_", " ").replaceFirstChar { it.uppercase() }
     }
 
@@ -719,6 +998,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         "goblin_ear" -> 8
         "iron_ore" -> 12
         "orc_tooth" -> 15
+        "rusty_sword" -> 18
+        "broken_shield" -> 15
+        "old_ring" -> 25
+        "gold_nugget" -> 30
+        "gold_loot" -> 1
         else -> 2
     }
 
@@ -750,6 +1034,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
         editor.putString("missions", missionsStr)
 
+        // Equipamentos
+        val equipsStr = state.equipments.entries.joinToString(",") { "${it.key}:${it.value}" }
+        editor.putString("equipments", equipsStr)
+
         editor.apply()
     }
 
@@ -759,7 +1047,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             val initialBuildings = listOf(
                 Building("guild", "Guilda dos Heróis", 1, 5, 200, emptyMap(), "O centro de operações do assentamento. Atrai heróis e gerencia contratos.", true),
                 Building("blacksmith", "Ferraria", 0, 5, 150, mapOf("slime_gel" to 5), "Forja armas melhores. Aumenta o dano de todos os heróis em +15%.", false),
-                Building("tavern", "Taberna", 0, 5, 200, mapOf("wolf_fur" to 8), "Oferece repouso confortável. Aumenta a velocidade de cura dos heróis em 100%.", false)
+                Building("tavern", "Taberna", 0, 5, 200, mapOf("wolf_fur" to 8), "Oferece repouso confortável. Aumenta a velocidade de cura dos heróis em 100%.", false),
+                Building("merchant", "Mercador", 0, 5, 100, mapOf("slime_gel" to 8, "wolf_fur" to 4), "Vende materiais do armazém de forma automática e passiva.", false)
             )
 
             val initialHeroes = listOf(
@@ -773,15 +1062,23 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             val orcLoot = listOf(LootDrop("orc_tooth", 0.8f), LootDrop("iron_ore", 0.4f))
 
             val posSlime = getRandomSpawnPosition()
+            val posSlime2 = getRandomSpawnPosition()
             val posWolf = getRandomSpawnPosition()
+            val posWolf2 = getRandomSpawnPosition()
             val posGoblin = getRandomSpawnPosition()
+            val posGoblin2 = getRandomSpawnPosition()
             val posOrc = getRandomSpawnPosition()
+            val posOrc2 = getRandomSpawnPosition()
 
             val initialMonsters = listOf(
                 Monster("slime1", "Slime Silvestre", 1, 40f, 40f, 6f, 1f, 15, 10, slimeLoot, posSlime.first, posSlime.second, posSlime.first, posSlime.second),
+                Monster("slime2", "Slime Silvestre", 1, 40f, 40f, 6f, 1f, 15, 10, slimeLoot, posSlime2.first, posSlime2.second, posSlime2.first, posSlime2.second),
                 Monster("wolf1", "Lobo da Floresta", 1, 60f, 60f, 9f, 2f, 25, 15, wolfLoot, posWolf.first, posWolf.second, posWolf.first, posWolf.second),
+                Monster("wolf2", "Lobo da Floresta", 1, 60f, 60f, 9f, 2f, 25, 15, wolfLoot, posWolf2.first, posWolf2.second, posWolf2.first, posWolf2.second),
                 Monster("goblin1", "Goblin Saqueador", 2, 85f, 85f, 13f, 3f, 40, 25, goblinLoot, posGoblin.first, posGoblin.second, posGoblin.first, posGoblin.second),
-                Monster("orc1", "Orc Silvestre", 3, 120f, 120f, 18f, 5f, 55, 40, orcLoot, posOrc.first, posOrc.second, posOrc.first, posOrc.second)
+                Monster("goblin2", "Goblin Saqueador", 2, 85f, 85f, 13f, 3f, 40, 25, goblinLoot, posGoblin2.first, posGoblin2.second, posGoblin2.first, posGoblin2.second),
+                Monster("orc1", "Orc Silvestre", 3, 120f, 120f, 18f, 5f, 55, 40, orcLoot, posOrc.first, posOrc.second, posOrc.first, posOrc.second),
+                Monster("orc2", "Orc Silvestre", 3, 120f, 120f, 18f, 5f, 55, 40, orcLoot, posOrc2.first, posOrc2.second, posOrc2.first, posOrc2.second)
             )
 
             val initialMissions = listOf(
@@ -790,7 +1087,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             )
 
             _gameState.value = GameState(
-                gold = 250,
+                gold = 5,
                 reputation = 0,
                 materials = emptyMap(),
                 heroes = initialHeroes,
@@ -804,7 +1101,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         // Carregar do SharedPreferences
-        val gold = sharedPrefs.getInt("gold", 250)
+        val gold = sharedPrefs.getInt("gold", 5)
         val reputation = sharedPrefs.getInt("reputation", 0)
 
         val matsStr = sharedPrefs.getString("materials", "") ?: ""
@@ -818,11 +1115,23 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
+        val equipsStr = sharedPrefs.getString("equipments", "") ?: ""
+        val equipments = mutableMapOf<String, Int>()
+        if (equipsStr.isNotEmpty()) {
+            equipsStr.split(",").forEach {
+                val parts = it.split(":")
+                if (parts.size == 2) {
+                    equipments[parts[0]] = parts[1].toInt()
+                }
+            }
+        }
+
         val buildingsStr = sharedPrefs.getString("buildings", "") ?: ""
         val initialBuildings = listOf(
             Building("guild", "Guilda dos Heróis", 1, 5, 200, emptyMap(), "O centro de operações do assentamento. Atrai heróis e gerencia contratos.", true),
             Building("blacksmith", "Ferraria", 0, 5, 150, mapOf("slime_gel" to 5), "Forja armas melhores. Aumenta o dano de todos os heróis em +15%.", false),
-            Building("tavern", "Taberna", 0, 5, 200, mapOf("wolf_fur" to 8), "Oferece repouso confortável. Aumenta a velocidade de cura dos heróis em 100%.", false)
+            Building("tavern", "Taberna", 0, 5, 200, mapOf("wolf_fur" to 8), "Oferece repouso confortável. Aumenta a velocidade de cura dos heróis em 100%.", false),
+            Building("merchant", "Mercador", 0, 5, 100, mapOf("slime_gel" to 8, "wolf_fur" to 4), "Vende materiais do armazém de forma automática e passiva.", false)
         )
         val buildings = initialBuildings.map { b ->
             val saved = buildingsStr.split(";").find { it.startsWith(b.id) }
@@ -876,15 +1185,23 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val orcLoot = listOf(LootDrop("orc_tooth", 0.8f), LootDrop("iron_ore", 0.4f))
 
         val posSlime = getRandomSpawnPosition()
+        val posSlime2 = getRandomSpawnPosition()
         val posWolf = getRandomSpawnPosition()
+        val posWolf2 = getRandomSpawnPosition()
         val posGoblin = getRandomSpawnPosition()
+        val posGoblin2 = getRandomSpawnPosition()
         val posOrc = getRandomSpawnPosition()
+        val posOrc2 = getRandomSpawnPosition()
 
         val monsters = listOf(
             Monster("slime1", "Slime Silvestre", 1, 40f, 40f, 6f, 1f, 15, 10, slimeLoot, posSlime.first, posSlime.second, posSlime.first, posSlime.second),
+            Monster("slime2", "Slime Silvestre", 1, 40f, 40f, 6f, 1f, 15, 10, slimeLoot, posSlime2.first, posSlime2.second, posSlime2.first, posSlime2.second),
             Monster("wolf1", "Lobo da Floresta", 1, 60f, 60f, 9f, 2f, 25, 15, wolfLoot, posWolf.first, posWolf.second, posWolf.first, posWolf.second),
+            Monster("wolf2", "Lobo da Floresta", 1, 60f, 60f, 9f, 2f, 25, 15, wolfLoot, posWolf2.first, posWolf2.second, posWolf2.first, posWolf2.second),
             Monster("goblin1", "Goblin Saqueador", 2, 85f, 85f, 13f, 3f, 40, 25, goblinLoot, posGoblin.first, posGoblin.second, posGoblin.first, posGoblin.second),
-            Monster("orc1", "Orc Silvestre", 3, 120f, 120f, 18f, 5f, 55, 40, orcLoot, posOrc.first, posOrc.second, posOrc.first, posOrc.second)
+            Monster("goblin2", "Goblin Saqueador", 2, 85f, 85f, 13f, 3f, 40, 25, goblinLoot, posGoblin2.first, posGoblin2.second, posGoblin2.first, posGoblin2.second),
+            Monster("orc1", "Orc Silvestre", 3, 120f, 120f, 18f, 5f, 55, 40, orcLoot, posOrc.first, posOrc.second, posOrc.first, posOrc.second),
+            Monster("orc2", "Orc Silvestre", 3, 120f, 120f, 18f, 5f, 55, 40, orcLoot, posOrc2.first, posOrc2.second, posOrc2.first, posOrc2.second)
         )
 
         // Carregar Missões
@@ -920,6 +1237,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             gold = gold,
             reputation = reputation,
             materials = materials,
+            equipments = equipments,
             heroes = heroes,
             monsters = monsters,
             missions = missions,

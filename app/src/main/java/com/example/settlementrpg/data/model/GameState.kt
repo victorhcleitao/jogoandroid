@@ -7,6 +7,7 @@ data class GameState(
     val gold: Int = 200,
     val reputation: Int = 0,
     val materials: Map<String, Int> = emptyMap(),
+    val equipments: Map<String, Int> = emptyMap(),
     val heroes: List<Hero> = emptyList(),
     val monsters: List<Monster> = emptyList(),
     val missions: List<Mission> = emptyList(),
