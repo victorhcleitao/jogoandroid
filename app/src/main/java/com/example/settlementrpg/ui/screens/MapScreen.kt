@@ -486,7 +486,7 @@ fun DrawScope.drawHeroSprite(
                 frameHeight = 100,
                 animIndex = animIndex,
                 flashActive = hero.flashTicks > 0,
-                sizeMultiplier = 1.25f
+                sizeMultiplier = 3.2f
             )
             if (success) return
         }
@@ -1063,7 +1063,7 @@ fun MapScreen(
                                             frameWidth = newBlacksmith.width,
                                             frameHeight = newBlacksmith.height,
                                             animIndex = 0,
-                                            sizeMultiplier = 2.0f
+                                            sizeMultiplier = 3.5f
                                         )
                                     } else {
                                         drawIsoBlacksmith(this, guildX, guildY, scale)
@@ -1093,7 +1093,7 @@ fun MapScreen(
                                             frameWidth = newMerchant.width,
                                             frameHeight = newMerchant.height,
                                             animIndex = 0,
-                                            sizeMultiplier = 1.8f
+                                            sizeMultiplier = 3.2f
                                         )
                                     } else {
                                         drawIsoMerchant(this, guildX, guildY, scale, merchantLvl)
