@@ -28,6 +28,7 @@ fun GuildScreen(
     onSellMaterial: (String) -> Unit,
     onCraftEquipment: (String) -> Unit,
     onEquipHero: (String, String) -> Unit,
+    onDiscardMission: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -368,23 +369,39 @@ fun GuildScreen(
 
                         if (!mission.isPublished) {
                             val canAfford = gameState.gold >= mission.goldReward
-                            Button(
-                                onClick = { onPublishMission(mission.id) },
-                                enabled = canAfford,
+                            Row(
                                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = GoldPrimary,
-                                    contentColor = Color.Black,
-                                    disabledContainerColor = DarkSurfaceVariant
-                                ),
-                                shape = RoundedCornerShape(4.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text(
-                                    text = if (canAfford) "Publicar Contrato (Liberar Caçada)" else "Ouro da Guilda Insuficiente",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp,
-                                    color = if (canAfford) Color.Black else TextGray
-                                )
+                                Button(
+                                    onClick = { onPublishMission(mission.id) },
+                                    enabled = canAfford,
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = GoldPrimary,
+                                        contentColor = Color.Black,
+                                        disabledContainerColor = DarkSurfaceVariant
+                                    ),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text(
+                                        text = if (canAfford) "Publicar" else "Sem Ouro",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.sp,
+                                        color = if (canAfford) Color.Black else TextGray
+                                    )
+                                }
+                                Button(
+                                    onClick = { onDiscardMission(mission.id) },
+                                    modifier = Modifier.width(90.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFFC62828),
+                                        contentColor = Color.White
+                                    ),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text(text = "Descartar", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                }
                             }
                         } else {
                             if (mission.assignedHeroId != null) {
@@ -394,19 +411,33 @@ fun GuildScreen(
                                         .padding(top = 8.dp)
                                         .clip(RoundedCornerShape(4.dp))
                                         .background(Color(0xFF2E3440))
-                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
                                 ) {
                                     Text(text = "Aceito por: $heroName", color = GoldLight, fontSize = 11.sp)
                                 }
                             } else {
-                                Box(
-                                    modifier = Modifier
-                                        .padding(top = 8.dp)
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .background(Color(0xFF1E3A52))
-                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(text = "Publicado (Aguardando Herói)", color = TextWhite, fontSize = 11.sp)
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(Color(0xFF1E3A52))
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(text = "Publicado (Aguardando Herói)", color = TextWhite, fontSize = 11.sp)
+                                    }
+                                    Button(
+                                        onClick = { onDiscardMission(mission.id) },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                        shape = RoundedCornerShape(4.dp),
+                                        modifier = Modifier.height(24.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828), contentColor = Color.White)
+                                    ) {
+                                        Text(text = "Cancelar (Reembolsar)", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
                         }

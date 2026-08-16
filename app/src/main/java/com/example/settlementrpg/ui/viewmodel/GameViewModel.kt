@@ -745,6 +745,26 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         saveGame()
     }
 
+    fun discardMission(missionId: String) {
+        val currentState = _gameState.value
+        val mission = currentState.missions.find { it.id == missionId } ?: return
+        
+        if (mission.assignedHeroId == null && !mission.isCompleted) {
+            val updatedMissionsList = currentState.missions.toMutableList()
+            updatedMissionsList.remove(mission)
+            
+            // Devolve o ouro caso já estivesse publicada
+            val refundGold = if (mission.isPublished) mission.goldReward else 0
+            
+            _gameState.value = currentState.copy(
+                gold = currentState.gold + refundGold,
+                missions = updatedMissionsList
+            )
+            addLog("Contrato: Missão '${mission.title}' descartada pelo administrador${if (refundGold > 0) " (+$refundGold 🪙 reembolsados)" else ""}.", LogType.SYSTEM)
+            saveGame()
+        }
+    }
+
     fun sellMaterialFromGuild(materialId: String, amount: Int = 1) {
         val currentState = _gameState.value
         val isEquipment = materialId in listOf("slime_sword", "wolf_armor", "power_ring")
@@ -949,14 +969,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             Triple("Goblin Saqueador", 2, getContractRewardForMonster("Goblin Saqueador")),
             Triple("Orc Silvestre", 3, getContractRewardForMonster("Orc Silvestre"))
         )
-        // Dificuldade máxima baseada no nível da Guilda
-        val maxDiff = min(targets.size, guildLvl)
+        // Filtra alvos compatíveis com o nível da guilda
+        val availableTargets = targets.filter { it.second <= guildLvl }
         
         // Se o ouro da guilda for muito baixo, força a geração de missões iniciantes mais baratas (Slime Silvestre)
         val selected = if (_gameState.value.gold < 10) {
             targets[0]
         } else {
-            targets[Random.nextInt(0, maxDiff)]
+            availableTargets[Random.nextInt(availableTargets.size)]
         }
 
         val titles = listOf(

@@ -110,6 +110,7 @@ fun MainScreen(
                     onSellMaterial = { viewModel.sellMaterialFromGuild(it) },
                     onCraftEquipment = { viewModel.craftEquipment(it) },
                     onEquipHero = { heroId, equipId -> viewModel.equipHero(heroId, equipId) },
+                    onDiscardMission = { viewModel.discardMission(it) },
                     modifier = Modifier.fillMaxSize()
                 )
                 2 -> LogScreen(logs = gameState.logs, modifier = Modifier.fillMaxSize())
