@@ -1,6 +1,7 @@
 package com.example.settlementrpg.ui.screens
 
 import android.graphics.BitmapFactory
+import android.graphics.Bitmap
 import android.content.Context
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -157,8 +158,28 @@ fun loadImageFromAssets(context: Context, path: String): ImageBitmap? {
         val options = BitmapFactory.Options().apply {
             inScaled = false // Impede o Android de redimensionar a imagem com base na densidade da tela
         }
-        val bitmap = BitmapFactory.decodeStream(inputStream, null, options)
-        bitmap?.asImageBitmap()
+        val bitmap = BitmapFactory.decodeStream(inputStream, null, options) ?: return null
+        
+        // Chroma Key em memória para remover o fundo branco
+        val mutableBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true)
+        val width = mutableBitmap.width
+        val height = mutableBitmap.height
+        val pixels = IntArray(width * height)
+        mutableBitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+        
+        for (i in pixels.indices) {
+            val color = pixels[i]
+            val alpha = (color shr 24) and 0xFF
+            val r = (color shr 16) and 0xFF
+            val g = (color shr 8) and 0xFF
+            val b = color and 0xFF
+            
+            if (alpha > 200 && r > 240 && g > 240 && b > 240) {
+                pixels[i] = 0x00000000 // Torna transparente
+            }
+        }
+        mutableBitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+        mutableBitmap.asImageBitmap()
     } catch (e: Exception) {
         null
     }
@@ -527,27 +548,51 @@ fun DrawScope.drawMonsterSprite(
     orcIdle: ImageBitmap?,
     orcWalk: ImageBitmap?,
     orcAttack: ImageBitmap?,
-    orcDeath: ImageBitmap?
+    orcDeath: ImageBitmap?,
+    orcIdleNew: ImageBitmap?,
+    slimeIdle: ImageBitmap?,
+    slimeDeath: ImageBitmap?,
+    wolfIdle: ImageBitmap?,
+    wolfDeath: ImageBitmap?,
+    goblinIdle: ImageBitmap?,
+    goblinDeath: ImageBitmap?
 ) {
-    if (monster.name.startsWith("Orc")) {
-        val bitmap = when {
-            monster.isDead -> orcDeath
-            monster.hp < monster.maxHp * 0.9f && animIndex % 2 == 0 -> orcAttack
-            else -> orcIdle
+    val name = monster.name
+    val isDead = monster.isDead
+    
+    val bitmap: ImageBitmap? = when {
+        name.startsWith("Orc") -> {
+            val baseIdle = orcIdleNew ?: orcIdle
+            when {
+                isDead -> orcDeath
+                monster.hp < monster.maxHp * 0.9f && animIndex % 2 == 0 -> orcAttack
+                else -> baseIdle
+            }
         }
-        if (bitmap != null) {
-            val success = drawIsoSpriteBitmap(
-                bitmap = bitmap,
-                center = center,
-                scale = scale,
-                frameWidth = 100,
-                frameHeight = 100,
-                animIndex = animIndex,
-                flashActive = monster.flashTicks > 0,
-                sizeMultiplier = 3.2f
-            )
-            if (success) return
+        name.startsWith("Slime") -> {
+            if (isDead) slimeDeath else slimeIdle
         }
+        name.startsWith("Lobo") -> {
+            if (isDead) wolfDeath else wolfIdle
+        }
+        name.startsWith("Goblin") -> {
+            if (isDead) goblinDeath else goblinIdle
+        }
+        else -> null
+    }
+
+    if (bitmap != null) {
+        val success = drawIsoSpriteBitmap(
+            bitmap = bitmap,
+            center = center,
+            scale = scale,
+            frameWidth = if (name.startsWith("Orc")) 100 else bitmap.width,
+            frameHeight = if (name.startsWith("Orc")) 100 else bitmap.height,
+            animIndex = if (name.startsWith("Orc")) animIndex else 0,
+            flashActive = monster.flashTicks > 0,
+            sizeMultiplier = if (name.startsWith("Orc")) 3.2f else if (name.startsWith("Slime")) 1.8f else 2.2f
+        )
+        if (success) return
     }
 
     if (!monster.isDead) {
@@ -684,12 +729,22 @@ fun MapScreen(
     val orcWalk = remember { loadImageFromAssets(context, "sprites/monstros/orc_walk.png") }
     val orcAttack = remember { loadImageFromAssets(context, "sprites/monstros/orc_attack.png") }
     val orcDeath = remember { loadImageFromAssets(context, "sprites/monstros/orc_death.png") }
+    val orcIdleNew = remember { loadImageFromAssets(context, "sprites/monstros/orc_idle_new.jpg") }
+
+    val slimeIdle = remember { loadImageFromAssets(context, "sprites/monstros/slime_idle.jpg") }
+    val slimeDeath = remember { loadImageFromAssets(context, "sprites/monstros/slime_death.jpg") }
+    val wolfIdle = remember { loadImageFromAssets(context, "sprites/monstros/wolf_idle.jpg") }
+    val wolfDeath = remember { loadImageFromAssets(context, "sprites/monstros/wolf_death.jpg") }
+    val goblinIdle = remember { loadImageFromAssets(context, "sprites/monstros/goblin_idle.jpg") }
+    val goblinDeath = remember { loadImageFromAssets(context, "sprites/monstros/goblin_death.jpg") }
     
     val campfire1 = remember { loadImageFromAssets(context, "sprites/ambiente/campfire_1.png") }
     val campfire2 = remember { loadImageFromAssets(context, "sprites/ambiente/campfire_2.png") }
     
     val stone1 = remember { loadImageFromAssets(context, "sprites/ambiente/stone_1.png") }
     val stone2 = remember { loadImageFromAssets(context, "sprites/ambiente/stone_2.png") }
+    val newStone = remember { loadImageFromAssets(context, "sprites/ambiente/stone_1_new.jpg") }
+    val newTree = remember { loadImageFromAssets(context, "sprites/ambiente/tree_1.jpg") }
 
     Card(
         modifier = modifier.fillMaxSize(),
@@ -1022,18 +1077,30 @@ fun MapScreen(
                                 is IsoDrawable.DecorItem -> {
                                     when (drawable.type) {
                                         "tree" -> {
-                                            val treeColors = mapOf('T' to Color(0xFF283626), 'B' to Color(0xFF4E3629))
                                             drawOval(
                                                 color = Color(0x28000000),
                                                 topLeft = Offset(isoPos.x - 12f * scale, isoPos.y - 5f * scale),
                                                 size = androidx.compose.ui.geometry.Size(24f * scale, 10f * scale)
                                             )
-                                            drawPixelSprite(
-                                                sprite = treeSprite,
-                                                colorMap = treeColors,
-                                                center = Offset(isoPos.x, isoPos.y - 18f * scale),
-                                                pixelSize = 3.5f * scale
-                                            )
+                                            if (newTree != null) {
+                                                drawIsoSpriteBitmap(
+                                                    bitmap = newTree,
+                                                    center = Offset(isoPos.x, isoPos.y - 20f * scale),
+                                                    scale = scale,
+                                                    frameWidth = newTree.width,
+                                                    frameHeight = newTree.height,
+                                                    animIndex = 0,
+                                                    sizeMultiplier = 1.3f
+                                                )
+                                            } else {
+                                                val treeColors = mapOf('T' to Color(0xFF283626), 'B' to Color(0xFF4E3629))
+                                                drawPixelSprite(
+                                                    sprite = treeSprite,
+                                                    colorMap = treeColors,
+                                                    center = Offset(isoPos.x, isoPos.y - 18f * scale),
+                                                    pixelSize = 3.5f * scale
+                                                )
+                                            }
                                         }
                                         "rock" -> {
                                             drawOval(
@@ -1041,7 +1108,7 @@ fun MapScreen(
                                                 topLeft = Offset(isoPos.x - 14f * scale, isoPos.y - 6f * scale),
                                                 size = androidx.compose.ui.geometry.Size(28f * scale, 12f * scale)
                                             )
-                                            val rockBmp = if ((drawable.decorX.toInt() + drawable.decorY.toInt()) % 2 == 0) stone1 else stone2
+                                            val rockBmp = if ((drawable.decorX.toInt() + drawable.decorY.toInt()) % 2 == 0) (newStone ?: stone1) else stone2
                                             if (rockBmp != null) {
                                                 drawIsoSpriteBitmap(
                                                     bitmap = rockBmp,
@@ -1050,7 +1117,7 @@ fun MapScreen(
                                                     frameWidth = rockBmp.width,
                                                     frameHeight = rockBmp.height,
                                                     animIndex = 0,
-                                                    sizeMultiplier = 0.9f
+                                                    sizeMultiplier = 1.1f
                                                 )
                                             } else {
                                                 val rockColors = mapOf('R' to Color(0xFF455A64), 'D' to Color(0xFF263238))
@@ -1188,7 +1255,14 @@ fun MapScreen(
                                         orcIdle = orcIdle,
                                         orcWalk = orcWalk,
                                         orcAttack = orcAttack,
-                                        orcDeath = orcDeath
+                                        orcDeath = orcDeath,
+                                        orcIdleNew = orcIdleNew,
+                                        slimeIdle = slimeIdle,
+                                        slimeDeath = slimeDeath,
+                                        wolfIdle = wolfIdle,
+                                        wolfDeath = wolfDeath,
+                                        goblinIdle = goblinIdle,
+                                        goblinDeath = goblinDeath
                                     )
 
                                     if (!monster.isDead) {
