@@ -745,6 +745,8 @@ fun MapScreen(
     val stone2 = remember { loadImageFromAssets(context, "sprites/ambiente/stone_2.png") }
     val newStone = remember { loadImageFromAssets(context, "sprites/ambiente/stone_1_new.jpg") }
     val newTree = remember { loadImageFromAssets(context, "sprites/ambiente/tree_1.jpg") }
+    val newMerchant = remember { loadImageFromAssets(context, "sprites/ambiente/merchant_new.png") }
+    val newBlacksmith = remember { loadImageFromAssets(context, "sprites/ambiente/blacksmith_new.png") }
 
     Card(
         modifier = modifier.fillMaxSize(),
@@ -1048,7 +1050,19 @@ fun MapScreen(
                                     )
                                 }
                                 is IsoDrawable.BlacksmithItem -> {
-                                    drawIsoBlacksmith(this, guildX, guildY, scale)
+                                    if (newBlacksmith != null) {
+                                        drawIsoSpriteBitmap(
+                                            bitmap = newBlacksmith,
+                                            center = Offset(isoPos.x, isoPos.y - 10f * scale),
+                                            scale = scale,
+                                            frameWidth = newBlacksmith.width,
+                                            frameHeight = newBlacksmith.height,
+                                            animIndex = 0,
+                                            sizeMultiplier = 1.2f
+                                        )
+                                    } else {
+                                        drawIsoBlacksmith(this, guildX, guildY, scale)
+                                    }
                                     drawText(
                                         textMeasurer = textMeasurer,
                                         text = "Ferraria Lvl $blacksmithLvl",
@@ -1066,7 +1080,19 @@ fun MapScreen(
                                     )
                                 }
                                 is IsoDrawable.MerchantItem -> {
-                                    drawIsoMerchant(this, guildX, guildY, scale, merchantLvl)
+                                    if (newMerchant != null) {
+                                        drawIsoSpriteBitmap(
+                                            bitmap = newMerchant,
+                                            center = Offset(isoPos.x, isoPos.y - 8f * scale),
+                                            scale = scale,
+                                            frameWidth = newMerchant.width,
+                                            frameHeight = newMerchant.height,
+                                            animIndex = 0,
+                                            sizeMultiplier = 1.1f
+                                        )
+                                    } else {
+                                        drawIsoMerchant(this, guildX, guildY, scale, merchantLvl)
+                                    }
                                     drawText(
                                         textMeasurer = textMeasurer,
                                         text = "Mercador Lvl $merchantLvl",
