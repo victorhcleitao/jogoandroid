@@ -293,8 +293,42 @@ fun drawIsoCastle(scope: DrawScope, centerX: Float, centerY: Float, scale: Float
     val strawRoof = Color(0xFFC2B280)
     val strawRoofLeft = Color(0xFF9E8E63)
 
-    if (level == 1) {
-        // Nível 1: Casebre rústico de madeira
+    if (level == 0) {
+        // Nível 0: Fogueira (Campfire)
+        val mainPos = toIsometric(300f, 300f, centerX, centerY, scale)
+        
+        // Círculo de pedras cinzas
+        scope.drawOval(
+            color = Color(0xFF757575),
+            topLeft = Offset(mainPos.x - 10f * scale, mainPos.y - 5f * scale),
+            size = androidx.compose.ui.geometry.Size(20f * scale, 10f * scale)
+        )
+        // Troncos de madeira marrom cruzados
+        scope.drawLine(
+            color = Color(0xFF5D4037),
+            start = Offset(mainPos.x - 7f * scale, mainPos.y - 2f * scale),
+            end = Offset(mainPos.x + 7f * scale, mainPos.y + 2f * scale),
+            strokeWidth = 2.5f * scale
+        )
+        scope.drawLine(
+            color = Color(0xFF4E342E),
+            start = Offset(mainPos.x + 7f * scale, mainPos.y - 2f * scale),
+            end = Offset(mainPos.x - 7f * scale, mainPos.y + 2f * scale),
+            strokeWidth = 2.5f * scale
+        )
+        // Chamas de fogo vermelhas/laranjas
+        scope.drawCircle(
+            color = Color(0xFFFF3D00),
+            radius = 4f * scale,
+            center = Offset(mainPos.x, mainPos.y - 3f * scale)
+        )
+        scope.drawCircle(
+            color = Color(0xFFFFC400),
+            radius = 2.5f * scale,
+            center = Offset(mainPos.x, mainPos.y - 5f * scale)
+        )
+    } else if (level == 1) {
+        // Nível 1: Casebre rústico de madeira (Tenda)
         val mainPos = toIsometric(300f, 300f, centerX, centerY, scale)
         drawIsoBox(scope, mainPos.x, mainPos.y, 16f * scale, 22f * scale, woodLeft, woodRight, woodTop)
         drawIsoPyramid(scope, mainPos.x, mainPos.y - 22f * scale, 16f * scale, 12f * scale, strawRoofLeft, strawRoof)

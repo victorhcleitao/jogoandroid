@@ -46,6 +46,16 @@ data class Hero(
 ) {
     val isDead: Boolean get() = hp <= 0f
 
+    val rank: String get() = when {
+        level >= 7 -> "S"
+        level >= 6 -> "A"
+        level >= 5 -> "B"
+        level >= 4 -> "C"
+        level >= 3 -> "D"
+        level >= 2 -> "E"
+        else -> "F"
+    }
+
     fun levelUp(): Hero {
         val newLevel = level + 1
         val newMaxXp = (maxXp * 1.5).roundToInt()

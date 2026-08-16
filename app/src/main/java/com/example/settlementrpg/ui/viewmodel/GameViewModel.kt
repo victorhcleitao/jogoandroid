@@ -467,7 +467,23 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         for (i in updatedHeroes.indices) {
             val hero = updatedHeroes[i]
             if (hero.state == HeroState.IDLE) {
-                val availableMission = updatedMissions.find { it.isPublished && it.assignedHeroId == null && !it.isCompleted }
+                val availableMission = updatedMissions.find { m ->
+                    if (!m.isPublished || m.assignedHeroId != null || m.isCompleted) return@find false
+                    
+                    // Trava de Ranks
+                    val requiredRank = when (m.difficulty) {
+                        3 -> "B"
+                        2 -> "D"
+                        else -> "F"
+                    }
+                    val rankValue = when (hero.rank) {
+                        "S" -> 6; "A" -> 5; "B" -> 4; "C" -> 3; "D" -> 2; "E" -> 1; else -> 0
+                    }
+                    val reqValue = when (requiredRank) {
+                        "S" -> 6; "A" -> 5; "B" -> 4; "C" -> 3; "D" -> 2; "E" -> 1; else -> 0
+                    }
+                    rankValue >= reqValue
+                }
                 if (availableMission != null) {
                     // Encontrar monstro alvo correspondente no mapa
                     val monster = monstersList.find { it.name.startsWith(availableMission.targetMonsterName) && !it.isDead }
@@ -639,10 +655,29 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             updatedMats[mat] = (updatedMats[mat] ?: 0) - amt
         }
 
-        val updatedBuilding = building.copy(
+        var updatedBuilding = building.copy(
             level = building.level + 1,
             isUnlocked = true
         )
+        
+        if (buildingId == "guild") {
+            val nextLvl = updatedBuilding.level
+            updatedBuilding = when (nextLvl) {
+                1 -> updatedBuilding.copy(
+                    name = "Tenda dos Caçadores",
+                    goldCost = 100,
+                    materialCost = mapOf("slime_gel" to 15, "wolf_fur" to 5),
+                    description = "Uma tenda rudimentar para planejar caçadas simples. Atrai aventureiros iniciantes."
+                )
+                else -> updatedBuilding.copy(
+                    name = "Guilda dos Heróis",
+                    goldCost = 200,
+                    materialCost = mapOf("slime_gel" to 20, "wolf_fur" to 10, "goblin_ear" to 5),
+                    description = "O imponente centro de operações da guilda. Atrai aventureiros avançados e lendários."
+                )
+            }
+        }
+
         val updatedBuildingsList = currentState.buildings.toMutableList()
         updatedBuildingsList[buildingIndex] = updatedBuilding
 
@@ -1065,7 +1100,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         if (!sharedPrefs.contains("gold")) {
             // Inicializar novo jogo
             val initialBuildings = listOf(
-                Building("guild", "Guilda dos Heróis", 1, 5, 200, emptyMap(), "O centro de operações do assentamento. Atrai heróis e gerencia contratos.", true),
+                Building("guild", "Acampamento (Fogueira)", 0, 5, 50, mapOf("slime_gel" to 10), "Um assentamento simples para iniciar a guilda de caçadores. Atrai heróis básicos.", true),
                 Building("blacksmith", "Ferraria", 0, 5, 150, mapOf("slime_gel" to 5), "Forja armas melhores. Aumenta o dano de todos os heróis em +15%.", false),
                 Building("tavern", "Taberna", 0, 5, 200, mapOf("wolf_fur" to 8), "Oferece repouso confortável. Aumenta a velocidade de cura dos heróis em 100%.", false),
                 Building("merchant", "Mercador", 0, 5, 100, mapOf("slime_gel" to 8, "wolf_fur" to 4), "Vende materiais do armazém de forma automática e passiva.", false)
@@ -1148,7 +1183,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
         val buildingsStr = sharedPrefs.getString("buildings", "") ?: ""
         val initialBuildings = listOf(
-            Building("guild", "Guilda dos Heróis", 1, 5, 200, emptyMap(), "O centro de operações do assentamento. Atrai heróis e gerencia contratos.", true),
+            Building("guild", "Acampamento (Fogueira)", 0, 5, 50, mapOf("slime_gel" to 10), "Um assentamento simples para iniciar a guilda de caçadores. Atrai heróis básicos.", true),
             Building("blacksmith", "Ferraria", 0, 5, 150, mapOf("slime_gel" to 5), "Forja armas melhores. Aumenta o dano de todos os heróis em +15%.", false),
             Building("tavern", "Taberna", 0, 5, 200, mapOf("wolf_fur" to 8), "Oferece repouso confortável. Aumenta a velocidade de cura dos heróis em 100%.", false),
             Building("merchant", "Mercador", 0, 5, 100, mapOf("slime_gel" to 8, "wolf_fur" to 4), "Vende materiais do armazém de forma automática e passiva.", false)

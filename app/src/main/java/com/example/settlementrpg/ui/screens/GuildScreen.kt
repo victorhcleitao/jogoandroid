@@ -496,7 +496,7 @@ fun GuildScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(text = "${hero.name} (Nível ${hero.level})", color = TextWhite, fontWeight = FontWeight.Bold)
+                            Text(text = "${hero.name} (Nível ${hero.level}) - [Rank ${hero.rank}]", color = TextWhite, fontWeight = FontWeight.Bold)
                             
                             val stateLabel = when(hero.state) {
                                 HeroState.IDLE -> "Ocioso"
