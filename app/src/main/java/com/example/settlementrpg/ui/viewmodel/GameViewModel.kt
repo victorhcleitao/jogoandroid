@@ -265,18 +265,28 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         var updatedMonster = monster.copy(hp = newMonsterHp, flashTicks = 1)
                         monstersList[monsterIndex] = updatedMonster
 
+                        val actionText = if (monster.name.startsWith("Coleta")) {
+                            "${hero.name} está trabalhando na ${monster.name} (Esforço: ${damageToMonster.toInt()})."
+                        } else {
+                            "${hero.name} causou ${damageToMonster.toInt()} de dano em ${monster.name}."
+                        }
                         logsToAdd.add(LogMessage(
                             id = UUID.randomUUID().toString(),
-                            text = "${hero.name} causou ${damageToMonster.toInt()} de dano em ${monster.name}.",
+                            text = actionText,
                             timestamp = System.currentTimeMillis(),
                             type = LogType.COMBAT
                         ))
 
                         if (newMonsterHp <= 0f) {
                             // Monstro derrotado!
+                            val deathText = if (monster.name.startsWith("Coleta")) {
+                                "${hero.name} concluiu a ${monster.name}!"
+                            } else {
+                                "${hero.name} derrotou ${monster.name}!"
+                            }
                             logsToAdd.add(LogMessage(
                                 id = UUID.randomUUID().toString(),
-                                text = "${hero.name} derrotou ${monster.name}!",
+                                text = deathText,
                                 timestamp = System.currentTimeMillis(),
                                 type = LogType.COMBAT
                             ))
@@ -354,56 +364,61 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                             }
 
                         } else {
-                            // Monstro contra-ataca
-                            val damageToHero = max(1f, monster.attack - hero.defense)
-                            val newHeroHp = max(0f, hero.hp - damageToHero)
-                            
-                            // Gerar texto flutuante de dano ao herói
-                            newFloatingTexts.add(FloatingText(
-                                id = UUID.randomUUID().toString(),
-                                text = "-${damageToHero.toInt()}",
-                                x = hero.x,
-                                y = hero.y - 10f,
-                                colorHex = "#FFE53935" // Vermelho mais forte
-                            ))
-                            
-                            logsToAdd.add(LogMessage(
-                                id = UUID.randomUUID().toString(),
-                                text = "${monster.name} atacou ${hero.name} causando ${damageToHero.toInt()} de dano.",
-                                timestamp = System.currentTimeMillis(),
-                                type = LogType.COMBAT
-                            ))
-
-                            if (newHeroHp <= 0f) {
-                                // Herói desmaiou!
-                                logsToAdd.add(LogMessage(
+                            if (!monster.name.startsWith("Coleta")) {
+                                // Monstro contra-ataca
+                                val damageToHero = max(1f, monster.attack - hero.defense)
+                                val newHeroHp = max(0f, hero.hp - damageToHero)
+                                
+                                // Gerar texto flutuante de dano ao herói
+                                newFloatingTexts.add(FloatingText(
                                     id = UUID.randomUUID().toString(),
-                                    text = "☠ ${hero.name} foi derrotado por ${monster.name} e resgatado de volta à guilda!",
-                                    timestamp = System.currentTimeMillis(),
-                                    type = LogType.GUILD
+                                    text = "-${damageToHero.toInt()}",
+                                    x = hero.x,
+                                    y = hero.y - 10f,
+                                    colorHex = "#FFE53935" // Vermelho mais forte
                                 ))
                                 
-                                // Teleportado de volta à guilda, sem loot
-                                updatedHeroes[i] = hero.copy(
-                                    hp = 1f,
-                                    state = HeroState.RESTING,
-                                    x = 300f,
-                                    y = 300f,
-                                    targetX = 300f,
-                                    targetY = 300f,
-                                    prevX = 300f,
-                                    prevY = 300f,
-                                    targetMonsterId = null,
-                                    currentMissionId = null,
-                                    collectedMaterials = emptyMap()
-                                )
+                                logsToAdd.add(LogMessage(
+                                    id = UUID.randomUUID().toString(),
+                                    text = "${monster.name} atacou ${hero.name} causando ${damageToHero.toInt()} de dano.",
+                                    timestamp = System.currentTimeMillis(),
+                                    type = LogType.COMBAT
+                                ))
 
-                                // Liberar missão se o herói falhou
-                                if (hero.currentMissionId != null) {
-                                    releaseMission(hero.currentMissionId)
+                                if (newHeroHp <= 0f) {
+                                    // Herói desmaiou!
+                                    logsToAdd.add(LogMessage(
+                                        id = UUID.randomUUID().toString(),
+                                        text = "☠ ${hero.name} foi derrotado por ${monster.name} e resgatado de volta à guilda!",
+                                        timestamp = System.currentTimeMillis(),
+                                        type = LogType.GUILD
+                                    ))
+                                    
+                                    // Teleportado de volta à guilda, sem loot
+                                    updatedHeroes[i] = hero.copy(
+                                        hp = 1f,
+                                        state = HeroState.RESTING,
+                                        x = 300f,
+                                        y = 300f,
+                                        targetX = 300f,
+                                        targetY = 300f,
+                                        prevX = 300f,
+                                        prevY = 300f,
+                                        targetMonsterId = null,
+                                        currentMissionId = null,
+                                        collectedMaterials = emptyMap()
+                                    )
+
+                                    // Liberar missão se o herói falhou
+                                    if (hero.currentMissionId != null) {
+                                        releaseMission(hero.currentMissionId)
+                                    }
+                                } else {
+                                    updatedHeroes[i] = hero.copy(hp = newHeroHp, flashTicks = 1)
                                 }
                             } else {
-                                updatedHeroes[i] = hero.copy(hp = newHeroHp, flashTicks = 1)
+                                // Se for coleta de recurso, o herói apenas bate sem receber dano de volta
+                                updatedHeroes[i] = hero.copy(flashTicks = 1)
                             }
                         }
                     }
@@ -998,38 +1013,77 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun generateRandomMission(guildLvl: Int): Mission {
-        val targets = listOf(
-            Triple("Slime Silvestre", 1, getContractRewardForMonster("Slime Silvestre")),
-            Triple("Lobo da Floresta", 1, getContractRewardForMonster("Lobo da Floresta")),
-            Triple("Goblin Saqueador", 2, getContractRewardForMonster("Goblin Saqueador")),
-            Triple("Orc Silvestre", 3, getContractRewardForMonster("Orc Silvestre"))
-        )
-        // Filtra alvos compatíveis com o nível da guilda
-        val availableTargets = targets.filter { it.second <= guildLvl }
+        val targets = mutableListOf<Triple<String, Int, Int>>()
         
-        // Se o ouro da guilda for muito baixo, força a geração de missões iniciantes mais baratas (Slime Silvestre)
-        val selected = if (_gameState.value.gold < 10) {
-            targets[0]
-        } else {
-            availableTargets[Random.nextInt(availableTargets.size)]
+        // Rank F (Guilda Lvl 0 ou 1)
+        targets.add(Triple("Slime Silvestre", 1, getContractRewardForMonster("Slime Silvestre")))
+        targets.add(Triple("Lobo da Floresta", 1, getContractRewardForMonster("Lobo da Floresta")))
+        targets.add(Triple("Coleta de Pedra", 1, 10))
+        targets.add(Triple("Coleta de Madeira", 1, 10))
+        targets.add(Triple("Coleta de Ervas", 1, 12))
+
+        // Rank E (Guilda Lvl 2+)
+        if (guildLvl >= 2) {
+            targets.add(Triple("Goblin Saqueador", 2, getContractRewardForMonster("Goblin Saqueador")))
+            targets.add(Triple("Coleta de Ferro", 2, 20))
+        }
+        
+        // Rank D / Guilda Lvl 3+
+        if (guildLvl >= 3) {
+            targets.add(Triple("Orc Silvestre", 3, getContractRewardForMonster("Orc Silvestre")))
         }
 
-        val titles = listOf(
-            "Caça ao ${selected.first}",
-            "Eliminar ameaça: ${selected.first}",
-            "Limpeza de área: ${selected.first}",
-            "Contrato Urgente: ${selected.first}"
-        )
+        val selected = targets[Random.nextInt(targets.size)]
+
+        val name = selected.first
+        val diff = selected.second
+        val reward = selected.third
+
+        val title: String
+        val description: String
+
+        when (name) {
+            "Coleta de Pedra" -> {
+                val titles = listOf("Coleta de Pedra", "Mineração de Pedra", "Contrato: Coleta de Pedra")
+                title = titles[Random.nextInt(titles.size)]
+                description = "Precisamos de blocos de rocha firme para a pavimentação do assentamento. Vá e traga pedras."
+            }
+            "Coleta de Madeira" -> {
+                val titles = listOf("Corte de Lenha", "Coleta de Madeira", "Contrato: Coleta de Madeira")
+                title = titles[Random.nextInt(titles.size)]
+                description = "Precisamos de madeira de carvalho para sustentar os tetos e aquecer a fogueira. Vá coletar madeira."
+            }
+            "Coleta de Ervas" -> {
+                val titles = listOf("Colheita de Ervas", "Ervas Medicinais", "Contrato: Coleta de Ervas")
+                title = titles[Random.nextInt(titles.size)]
+                description = "Ervas medicinais raras brotaram na floresta. Colha-as para o estoque de poções de cura."
+            }
+            "Coleta de Ferro" -> {
+                val titles = listOf("Mineração de Ferro", "Extração de Ferro", "Contrato: Coleta de Ferro")
+                title = titles[Random.nextInt(titles.size)]
+                description = "Um filão de minério de ferro de alta pureza foi localizado. Extraia-o para a forja de armas."
+            }
+            else -> {
+                val titles = listOf(
+                    "Caça ao $name",
+                    "Eliminar ameaça: $name",
+                    "Limpeza de área: $name",
+                    "Contrato Urgente: $name"
+                )
+                title = titles[Random.nextInt(titles.size)]
+                description = "Monstros do tipo $name estão assustando moradores locais nos arredores. Vá e elimine o perigo."
+            }
+        }
 
         return Mission(
             id = UUID.randomUUID().toString(),
-            title = titles[Random.nextInt(titles.size)],
-            description = "Monstros do tipo ${selected.first} estão assustando moradores locais nos arredores. Vá e elimine o perigo.",
-            difficulty = selected.second,
-            targetMonsterName = selected.first,
-            monsterLevel = selected.second,
-            goldReward = selected.third,
-            reputationReward = selected.second * 10
+            title = title,
+            description = description,
+            difficulty = diff,
+            targetMonsterName = name,
+            monsterLevel = diff,
+            goldReward = reward,
+            reputationReward = diff * 10
         )
     }
 
@@ -1044,6 +1098,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         "old_ring" -> "Anel Antigo"
         "gold_nugget" -> "Pepita de Ouro"
         "gold_loot" -> "Ouro Coletado"
+        "wood" -> "Madeira"
+        "stone" -> "Pedra"
+        "medicinal_herbs" -> "Ervas Medicinais"
         else -> matId.replace("_", " ").replaceFirstChar { it.uppercase() }
     }
 
@@ -1058,6 +1115,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         "old_ring" -> 25
         "gold_nugget" -> 30
         "gold_loot" -> 1
+        "wood" -> 2
+        "stone" -> 2
+        "medicinal_herbs" -> 4
         else -> 2
     }
 
@@ -1115,6 +1175,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             val wolfLoot = listOf(LootDrop("wolf_fur", 0.7f))
             val goblinLoot = listOf(LootDrop("goblin_ear", 0.6f), LootDrop("iron_ore", 0.3f))
             val orcLoot = listOf(LootDrop("orc_tooth", 0.8f), LootDrop("iron_ore", 0.4f))
+            val woodLoot = listOf(LootDrop("wood", 1.0f))
+            val stoneLoot = listOf(LootDrop("stone", 1.0f))
+            val herbsLoot = listOf(LootDrop("medicinal_herbs", 1.0f))
+            val ironLoot = listOf(LootDrop("iron_ore", 1.0f))
 
             val posSlime = getRandomSpawnPosition()
             val posSlime2 = getRandomSpawnPosition()
@@ -1124,6 +1188,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             val posGoblin2 = getRandomSpawnPosition()
             val posOrc = getRandomSpawnPosition()
             val posOrc2 = getRandomSpawnPosition()
+            val posWood1 = getRandomSpawnPosition()
+            val posWood2 = getRandomSpawnPosition()
+            val posStone1 = getRandomSpawnPosition()
+            val posStone2 = getRandomSpawnPosition()
+            val posHerbs1 = getRandomSpawnPosition()
+            val posHerbs2 = getRandomSpawnPosition()
+            val posIron1 = getRandomSpawnPosition()
+            val posIron2 = getRandomSpawnPosition()
 
             val initialMonsters = listOf(
                 Monster("slime1", "Slime Silvestre", 1, 40f, 40f, 6f, 1f, 15, 10, slimeLoot, posSlime.first, posSlime.second, posSlime.first, posSlime.second),
@@ -1133,7 +1205,15 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 Monster("goblin1", "Goblin Saqueador", 2, 85f, 85f, 13f, 3f, 40, 25, goblinLoot, posGoblin.first, posGoblin.second, posGoblin.first, posGoblin.second),
                 Monster("goblin2", "Goblin Saqueador", 2, 85f, 85f, 13f, 3f, 40, 25, goblinLoot, posGoblin2.first, posGoblin2.second, posGoblin2.first, posGoblin2.second),
                 Monster("orc1", "Orc Silvestre", 3, 120f, 120f, 18f, 5f, 55, 40, orcLoot, posOrc.first, posOrc.second, posOrc.first, posOrc.second),
-                Monster("orc2", "Orc Silvestre", 3, 120f, 120f, 18f, 5f, 55, 40, orcLoot, posOrc2.first, posOrc2.second, posOrc2.first, posOrc2.second)
+                Monster("orc2", "Orc Silvestre", 3, 120f, 120f, 18f, 5f, 55, 40, orcLoot, posOrc2.first, posOrc2.second, posOrc2.first, posOrc2.second),
+                Monster("wood1", "Coleta de Madeira", 1, 30f, 30f, 0f, 0f, 0, 5, woodLoot, posWood1.first, posWood1.second, posWood1.first, posWood1.second),
+                Monster("wood2", "Coleta de Madeira", 1, 30f, 30f, 0f, 0f, 0, 5, woodLoot, posWood2.first, posWood2.second, posWood2.first, posWood2.second),
+                Monster("stone1_res", "Coleta de Pedra", 1, 35f, 35f, 0f, 0f, 0, 5, stoneLoot, posStone1.first, posStone1.second, posStone1.first, posStone1.second),
+                Monster("stone2_res", "Coleta de Pedra", 1, 35f, 35f, 0f, 0f, 0, 5, stoneLoot, posStone2.first, posStone2.second, posStone2.first, posStone2.second),
+                Monster("herbs1", "Coleta de Ervas", 1, 20f, 20f, 0f, 0f, 0, 5, herbsLoot, posHerbs1.first, posHerbs1.second, posHerbs1.first, posHerbs1.second),
+                Monster("herbs2", "Coleta de Ervas", 1, 20f, 20f, 0f, 0f, 0, 5, herbsLoot, posHerbs2.first, posHerbs2.second, posHerbs2.first, posHerbs2.second),
+                Monster("iron1", "Coleta de Ferro", 2, 50f, 50f, 0f, 0f, 0, 10, ironLoot, posIron1.first, posIron1.second, posIron1.first, posIron1.second),
+                Monster("iron2", "Coleta de Ferro", 2, 50f, 50f, 0f, 0f, 0, 10, ironLoot, posIron2.first, posIron2.second, posIron2.first, posIron2.second)
             )
 
             val initialMissions = listOf(
@@ -1238,6 +1318,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val wolfLoot = listOf(LootDrop("wolf_fur", 0.7f))
         val goblinLoot = listOf(LootDrop("goblin_ear", 0.6f), LootDrop("iron_ore", 0.3f))
         val orcLoot = listOf(LootDrop("orc_tooth", 0.8f), LootDrop("iron_ore", 0.4f))
+        val woodLoot = listOf(LootDrop("wood", 1.0f))
+        val stoneLoot = listOf(LootDrop("stone", 1.0f))
+        val herbsLoot = listOf(LootDrop("medicinal_herbs", 1.0f))
+        val ironLoot = listOf(LootDrop("iron_ore", 1.0f))
 
         val posSlime = getRandomSpawnPosition()
         val posSlime2 = getRandomSpawnPosition()
@@ -1247,6 +1331,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val posGoblin2 = getRandomSpawnPosition()
         val posOrc = getRandomSpawnPosition()
         val posOrc2 = getRandomSpawnPosition()
+        val posWood1 = getRandomSpawnPosition()
+        val posWood2 = getRandomSpawnPosition()
+        val posStone1 = getRandomSpawnPosition()
+        val posStone2 = getRandomSpawnPosition()
+        val posHerbs1 = getRandomSpawnPosition()
+        val posHerbs2 = getRandomSpawnPosition()
+        val posIron1 = getRandomSpawnPosition()
+        val posIron2 = getRandomSpawnPosition()
 
         val monsters = listOf(
             Monster("slime1", "Slime Silvestre", 1, 40f, 40f, 6f, 1f, 15, 10, slimeLoot, posSlime.first, posSlime.second, posSlime.first, posSlime.second),
@@ -1256,7 +1348,15 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             Monster("goblin1", "Goblin Saqueador", 2, 85f, 85f, 13f, 3f, 40, 25, goblinLoot, posGoblin.first, posGoblin.second, posGoblin.first, posGoblin.second),
             Monster("goblin2", "Goblin Saqueador", 2, 85f, 85f, 13f, 3f, 40, 25, goblinLoot, posGoblin2.first, posGoblin2.second, posGoblin2.first, posGoblin2.second),
             Monster("orc1", "Orc Silvestre", 3, 120f, 120f, 18f, 5f, 55, 40, orcLoot, posOrc.first, posOrc.second, posOrc.first, posOrc.second),
-            Monster("orc2", "Orc Silvestre", 3, 120f, 120f, 18f, 5f, 55, 40, orcLoot, posOrc2.first, posOrc2.second, posOrc2.first, posOrc2.second)
+            Monster("orc2", "Orc Silvestre", 3, 120f, 120f, 18f, 5f, 55, 40, orcLoot, posOrc2.first, posOrc2.second, posOrc2.first, posOrc2.second),
+            Monster("wood1", "Coleta de Madeira", 1, 30f, 30f, 0f, 0f, 0, 5, woodLoot, posWood1.first, posWood1.second, posWood1.first, posWood1.second),
+            Monster("wood2", "Coleta de Madeira", 1, 30f, 30f, 0f, 0f, 0, 5, woodLoot, posWood2.first, posWood2.second, posWood2.first, posWood2.second),
+            Monster("stone1_res", "Coleta de Pedra", 1, 35f, 35f, 0f, 0f, 0, 5, stoneLoot, posStone1.first, posStone1.second, posStone1.first, posStone1.second),
+            Monster("stone2_res", "Coleta de Pedra", 1, 35f, 35f, 0f, 0f, 0, 5, stoneLoot, posStone2.first, posStone2.second, posStone2.first, posStone2.second),
+            Monster("herbs1", "Coleta de Ervas", 1, 20f, 20f, 0f, 0f, 0, 5, herbsLoot, posHerbs1.first, posHerbs1.second, posHerbs1.first, posHerbs1.second),
+            Monster("herbs2", "Coleta de Ervas", 1, 20f, 20f, 0f, 0f, 0, 5, herbsLoot, posHerbs2.first, posHerbs2.second, posHerbs2.first, posHerbs2.second),
+            Monster("iron1", "Coleta de Ferro", 2, 50f, 50f, 0f, 0f, 0, 10, ironLoot, posIron1.first, posIron1.second, posIron1.first, posIron1.second),
+            Monster("iron2", "Coleta de Ferro", 2, 50f, 50f, 0f, 0f, 0, 10, ironLoot, posIron2.first, posIron2.second, posIron2.first, posIron2.second)
         )
 
         // Carregar Missões

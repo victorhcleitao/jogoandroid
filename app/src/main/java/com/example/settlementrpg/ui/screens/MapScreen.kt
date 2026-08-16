@@ -158,28 +158,8 @@ fun loadImageFromAssets(context: Context, path: String): ImageBitmap? {
         val options = BitmapFactory.Options().apply {
             inScaled = false // Impede o Android de redimensionar a imagem com base na densidade da tela
         }
-        val bitmap = BitmapFactory.decodeStream(inputStream, null, options) ?: return null
-        
-        // Chroma Key em memória para remover o fundo branco
-        val mutableBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true)
-        val width = mutableBitmap.width
-        val height = mutableBitmap.height
-        val pixels = IntArray(width * height)
-        mutableBitmap.getPixels(pixels, 0, width, 0, 0, width, height)
-        
-        for (i in pixels.indices) {
-            val color = pixels[i]
-            val alpha = (color shr 24) and 0xFF
-            val r = (color shr 16) and 0xFF
-            val g = (color shr 8) and 0xFF
-            val b = color and 0xFF
-            
-            if (alpha > 200 && r > 240 && g > 240 && b > 240) {
-                pixels[i] = 0x00000000 // Torna transparente
-            }
-        }
-        mutableBitmap.setPixels(pixels, 0, width, 0, 0, width, height)
-        mutableBitmap.asImageBitmap()
+        val bitmap = BitmapFactory.decodeStream(inputStream, null, options)
+        bitmap?.asImageBitmap()
     } catch (e: Exception) {
         null
     }
@@ -555,7 +535,9 @@ fun DrawScope.drawMonsterSprite(
     wolfIdle: ImageBitmap?,
     wolfDeath: ImageBitmap?,
     goblinIdle: ImageBitmap?,
-    goblinDeath: ImageBitmap?
+    goblinDeath: ImageBitmap?,
+    newTree: ImageBitmap?,
+    newStone: ImageBitmap?
 ) {
     val name = monster.name
     val isDead = monster.isDead
@@ -578,10 +560,33 @@ fun DrawScope.drawMonsterSprite(
         name.startsWith("Goblin") -> {
             if (isDead) goblinDeath else goblinIdle
         }
+        name.startsWith("Coleta de Madeira") -> {
+            if (isDead) null else newTree
+        }
+        name.startsWith("Coleta de Pedra") -> {
+            if (isDead) null else newStone
+        }
+        name.startsWith("Coleta de Ervas") -> {
+            if (isDead) null else newTree
+        }
+        name.startsWith("Coleta de Ferro") -> {
+            if (isDead) null else newStone
+        }
         else -> null
     }
 
     if (bitmap != null) {
+        val sizeMult = when {
+            name.startsWith("Orc") -> 3.2f
+            name.startsWith("Slime") -> 1.8f
+            name.startsWith("Lobo") -> 2.2f
+            name.startsWith("Goblin") -> 2.2f
+            name.startsWith("Coleta de Madeira") -> 2.5f
+            name.startsWith("Coleta de Pedra") -> 1.6f
+            name.startsWith("Coleta de Ervas") -> 1.0f
+            name.startsWith("Coleta de Ferro") -> 1.8f
+            else -> 1.0f
+        }
         val success = drawIsoSpriteBitmap(
             bitmap = bitmap,
             center = center,
@@ -590,7 +595,7 @@ fun DrawScope.drawMonsterSprite(
             frameHeight = if (name.startsWith("Orc")) 100 else bitmap.height,
             animIndex = if (name.startsWith("Orc")) animIndex else 0,
             flashActive = monster.flashTicks > 0,
-            sizeMultiplier = if (name.startsWith("Orc")) 3.2f else if (name.startsWith("Slime")) 1.8f else 2.2f
+            sizeMultiplier = sizeMult
         )
         if (success) return
     }
@@ -729,22 +734,22 @@ fun MapScreen(
     val orcWalk = remember { loadImageFromAssets(context, "sprites/monstros/orc_walk.png") }
     val orcAttack = remember { loadImageFromAssets(context, "sprites/monstros/orc_attack.png") }
     val orcDeath = remember { loadImageFromAssets(context, "sprites/monstros/orc_death.png") }
-    val orcIdleNew = remember { loadImageFromAssets(context, "sprites/monstros/orc_idle_new.jpg") }
+    val orcIdleNew = remember { loadImageFromAssets(context, "sprites/monstros/orc_idle_new.png") }
 
-    val slimeIdle = remember { loadImageFromAssets(context, "sprites/monstros/slime_idle.jpg") }
-    val slimeDeath = remember { loadImageFromAssets(context, "sprites/monstros/slime_death.jpg") }
-    val wolfIdle = remember { loadImageFromAssets(context, "sprites/monstros/wolf_idle.jpg") }
-    val wolfDeath = remember { loadImageFromAssets(context, "sprites/monstros/wolf_death.jpg") }
-    val goblinIdle = remember { loadImageFromAssets(context, "sprites/monstros/goblin_idle.jpg") }
-    val goblinDeath = remember { loadImageFromAssets(context, "sprites/monstros/goblin_death.jpg") }
+    val slimeIdle = remember { loadImageFromAssets(context, "sprites/monstros/slime_idle.png") }
+    val slimeDeath = remember { loadImageFromAssets(context, "sprites/monstros/slime_death.png") }
+    val wolfIdle = remember { loadImageFromAssets(context, "sprites/monstros/wolf_idle.png") }
+    val wolfDeath = remember { loadImageFromAssets(context, "sprites/monstros/wolf_death.png") }
+    val goblinIdle = remember { loadImageFromAssets(context, "sprites/monstros/goblin_idle.png") }
+    val goblinDeath = remember { loadImageFromAssets(context, "sprites/monstros/goblin_death.png") }
     
     val campfire1 = remember { loadImageFromAssets(context, "sprites/ambiente/campfire_1.png") }
     val campfire2 = remember { loadImageFromAssets(context, "sprites/ambiente/campfire_2.png") }
     
     val stone1 = remember { loadImageFromAssets(context, "sprites/ambiente/stone_1.png") }
     val stone2 = remember { loadImageFromAssets(context, "sprites/ambiente/stone_2.png") }
-    val newStone = remember { loadImageFromAssets(context, "sprites/ambiente/stone_1_new.jpg") }
-    val newTree = remember { loadImageFromAssets(context, "sprites/ambiente/tree_1.jpg") }
+    val newStone = remember { loadImageFromAssets(context, "sprites/ambiente/stone_1_new.png") }
+    val newTree = remember { loadImageFromAssets(context, "sprites/ambiente/tree_1.png") }
     val newMerchant = remember { loadImageFromAssets(context, "sprites/ambiente/merchant_new.png") }
     val newBlacksmith = remember { loadImageFromAssets(context, "sprites/ambiente/blacksmith_new.png") }
 
@@ -1288,7 +1293,9 @@ fun MapScreen(
                                         wolfIdle = wolfIdle,
                                         wolfDeath = wolfDeath,
                                         goblinIdle = goblinIdle,
-                                        goblinDeath = goblinDeath
+                                        goblinDeath = goblinDeath,
+                                        newTree = newTree,
+                                        newStone = newStone
                                     )
 
                                     if (!monster.isDead) {
@@ -1309,14 +1316,21 @@ fun MapScreen(
                                             topLeft = Offset(barX, barY),
                                             size = androidx.compose.ui.geometry.Size(barWidth, barHeight)
                                         )
+                                        val hpColor = if (monster.name.startsWith("Coleta")) Color(0xFF29B6F6) else HealthRed
                                         drawRect(
-                                            color = HealthRed,
+                                            color = hpColor,
                                             topLeft = Offset(barX, barY),
                                             size = androidx.compose.ui.geometry.Size(barWidth * hpRatio, barHeight)
                                         )
 
+                                        val displayName = if (monster.name.startsWith("Coleta")) {
+                                            monster.name.substringAfter("Coleta de ")
+                                        } else {
+                                            monster.name.substringBefore(" ")
+                                        }
+
                                         val nameLayout = textMeasurer.measure(
-                                            text = monster.name.substringBefore(" "),
+                                            text = displayName,
                                             style = TextStyle(color = TextWhite, fontSize = 8.sp, fontWeight = FontWeight.SemiBold),
                                             softWrap = false
                                         )
