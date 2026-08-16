@@ -486,7 +486,7 @@ fun DrawScope.drawHeroSprite(
                 frameHeight = 100,
                 animIndex = animIndex,
                 flashActive = hero.flashTicks > 0,
-                sizeMultiplier = 3.2f
+                sizeMultiplier = 1.25f
             )
             if (success) return
         }
@@ -515,7 +515,7 @@ fun DrawScope.drawHeroSprite(
         sprite = sprite,
         colorMap = colorMap,
         center = center,
-        pixelSize = 3.5f * scale,
+        pixelSize = 4.0f * scale,
         flashActive = hero.flashTicks > 0
     )
 }
@@ -577,14 +577,14 @@ fun DrawScope.drawMonsterSprite(
 
     if (bitmap != null) {
         val sizeMult = when {
-            name.startsWith("Orc") -> 3.2f
-            name.startsWith("Slime") -> 1.8f
-            name.startsWith("Lobo") -> 2.2f
-            name.startsWith("Goblin") -> 2.2f
-            name.startsWith("Coleta de Madeira") -> 2.5f
-            name.startsWith("Coleta de Pedra") -> 1.6f
-            name.startsWith("Coleta de Ervas") -> 1.0f
-            name.startsWith("Coleta de Ferro") -> 1.8f
+            name.startsWith("Orc") -> 1.5f
+            name.startsWith("Slime") -> 0.8f
+            name.startsWith("Lobo") -> 1.2f
+            name.startsWith("Goblin") -> 1.1f
+            name.startsWith("Coleta de Madeira") -> 1.6f
+            name.startsWith("Coleta de Pedra") -> 1.2f
+            name.startsWith("Coleta de Ervas") -> 0.9f
+            name.startsWith("Coleta de Ferro") -> 1.3f
             else -> 1.0f
         }
         val success = drawIsoSpriteBitmap(
@@ -1063,7 +1063,7 @@ fun MapScreen(
                                             frameWidth = newBlacksmith.width,
                                             frameHeight = newBlacksmith.height,
                                             animIndex = 0,
-                                            sizeMultiplier = 1.2f
+                                            sizeMultiplier = 2.0f
                                         )
                                     } else {
                                         drawIsoBlacksmith(this, guildX, guildY, scale)
@@ -1093,7 +1093,7 @@ fun MapScreen(
                                             frameWidth = newMerchant.width,
                                             frameHeight = newMerchant.height,
                                             animIndex = 0,
-                                            sizeMultiplier = 1.1f
+                                            sizeMultiplier = 1.8f
                                         )
                                     } else {
                                         drawIsoMerchant(this, guildX, guildY, scale, merchantLvl)

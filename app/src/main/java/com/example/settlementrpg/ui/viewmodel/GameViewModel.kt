@@ -1018,14 +1018,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         // Rank F (Guilda Lvl 0 ou 1)
         targets.add(Triple("Slime Silvestre", 1, getContractRewardForMonster("Slime Silvestre")))
         targets.add(Triple("Lobo da Floresta", 1, getContractRewardForMonster("Lobo da Floresta")))
-        targets.add(Triple("Coleta de Pedra", 1, 10))
-        targets.add(Triple("Coleta de Madeira", 1, 10))
-        targets.add(Triple("Coleta de Ervas", 1, 12))
+        targets.add(Triple("Coleta de Pedra", 1, 1))
+        targets.add(Triple("Coleta de Madeira", 1, 1))
+        targets.add(Triple("Coleta de Ervas", 1, 2))
 
         // Rank E (Guilda Lvl 2+)
         if (guildLvl >= 2) {
             targets.add(Triple("Goblin Saqueador", 2, getContractRewardForMonster("Goblin Saqueador")))
-            targets.add(Triple("Coleta de Ferro", 2, 20))
+            targets.add(Triple("Coleta de Ferro", 2, 7))
         }
         
         // Rank D / Guilda Lvl 3+
