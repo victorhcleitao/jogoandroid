@@ -151,10 +151,6 @@ val torchSprite = arrayOf(
     "...S..."
 )
 
-import android.graphics.Bitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import kotlin.math.max
-
 // Dicionário global para guardar a largura do frame real após o trim
 val spriteFrameWidths = mutableMapOf<ImageBitmap, Int>()
 
