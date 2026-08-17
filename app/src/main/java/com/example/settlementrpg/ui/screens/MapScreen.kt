@@ -151,6 +151,76 @@ val torchSprite = arrayOf(
     "...S..."
 )
 
+import android.graphics.Bitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import kotlin.math.max
+
+// Dicionário global para guardar a largura do frame real após o trim
+val spriteFrameWidths = mutableMapOf<ImageBitmap, Int>()
+
+// Função utilitária de Trim Automático unificado para animações
+fun trimSpriteSheet(src: Bitmap, frameWidth: Int, frameHeight: Int): Pair<Bitmap, Int> {
+    val totalFrames = src.width / frameWidth
+    var minX = frameWidth
+    var minY = frameHeight
+    var maxX = 0
+    var maxY = 0
+    
+    // Alocar array de pixels para varredura rápida de RAM (evita getPixel em loop lento)
+    val pixels = IntArray(src.width * src.height)
+    src.getPixels(pixels, 0, src.width, 0, 0, src.width, src.height)
+    
+    // Achar os limites de pixels visíveis em todos os frames relativos
+    for (f in 0 until totalFrames) {
+        val frameOffset = f * frameWidth
+        for (y in 0 until frameHeight) {
+            for (x in 0 until frameWidth) {
+                val pixelX = frameOffset + x
+                val color = pixels[y * src.width + pixelX]
+                val alpha = (color ushr 24) and 0xFF
+                if (alpha > 5) { // Pixel visível
+                    if (x < minX) minX = x
+                    if (y < minY) minY = y
+                    if (x > maxX) maxX = x
+                    if (y > maxY) maxY = y
+                }
+            }
+        }
+    }
+    
+    // Se não encontrou nenhum pixel visível (imagem vazia), retorna a original
+    if (maxX < minX || maxY < minY) {
+        return Pair(src, frameWidth)
+    }
+    
+    // Calcular tamanho e offsets unificados
+    val trimmedFrameW = maxX - minX + 1
+    val trimmedFrameH = maxY - minY + 1
+    
+    // Criar um novo bitmap para o spritesheet recortado
+    val destWidth = trimmedFrameW * totalFrames
+    val destHeight = trimmedFrameH
+    val destBitmap = Bitmap.createBitmap(destWidth, destHeight, Bitmap.Config.ARGB_8888)
+    
+    // Copiar cada frame recortado para o novo bitmap
+    for (f in 0 until totalFrames) {
+        val srcX = f * frameWidth + minX
+        val srcY = minY
+        val destX = f * trimmedFrameW
+        val destY = 0
+        
+        // Copiar pixels do frame original para o destino
+        for (y in 0 until trimmedFrameH) {
+            for (x in 0 until trimmedFrameW) {
+                val color = pixels[(srcY + y) * src.width + (srcX + x)]
+                destBitmap.setPixel(destX + x, destY + y, color)
+            }
+        }
+    }
+    
+    return Pair(destBitmap, trimmedFrameW)
+}
+
 // --- CARREGADOR DE BITMAPS DA PASTA ASSETS/ ---
 fun loadImageFromAssets(context: Context, path: String): ImageBitmap? {
     return try {
@@ -158,8 +228,28 @@ fun loadImageFromAssets(context: Context, path: String): ImageBitmap? {
         val options = BitmapFactory.Options().apply {
             inScaled = false // Impede o Android de redimensionar a imagem com base na densidade da tela
         }
-        val bitmap = BitmapFactory.decodeStream(inputStream, null, options)
-        bitmap?.asImageBitmap()
+        val originalBitmap = BitmapFactory.decodeStream(inputStream, null, options) ?: return null
+        
+        // Descobrir a largura de frame padrão original baseada no nome
+        val defaultFrameW = when {
+            path.contains("guerreiro", ignoreCase = true) -> 100
+            path.contains("orc_", ignoreCase = true) -> 100
+            else -> originalBitmap.width
+        }
+        val defaultFrameH = when {
+            path.contains("guerreiro", ignoreCase = true) -> 100
+            path.contains("orc_", ignoreCase = true) -> 100
+            else -> originalBitmap.height
+        }
+        
+        // Executar o trim automático unificado
+        val (trimmedBitmap, finalFrameW) = trimSpriteSheet(originalBitmap, defaultFrameW, defaultFrameH)
+        val imageBitmap = trimmedBitmap.asImageBitmap()
+        
+        // Registrar o frameWidth resultante no mapa para ser recuperado no desenho
+        spriteFrameWidths[imageBitmap] = finalFrameW
+        
+        imageBitmap
     } catch (e: Exception) {
         null
     }
@@ -418,23 +508,26 @@ fun drawIsoMerchant(scope: DrawScope, centerX: Float, centerY: Float, scale: Flo
     )
 }
 
-// --- DESENHAR BITMAP SLICE (PNG SPRITES SHEET) ---
+// --- DESENHAR BITMAP SLICE COM TRIMMING AUTOMÁTICO E ALTURA DE REFERÊNCIA ---
 fun DrawScope.drawIsoSpriteBitmap(
     bitmap: ImageBitmap,
     center: Offset,
     scale: Float,
-    frameWidth: Int = 100,
-    frameHeight: Int = 100,
+    refHeight: Float, // Altura de referência do personagem/objeto em tela (a zoom 1.0x)
     animIndex: Int = 0,
-    flashActive: Boolean = false,
-    sizeMultiplier: Float = 1.15f
+    flashActive: Boolean = false
 ): Boolean {
     return try {
-        val totalFrames = max(1, bitmap.width / frameWidth)
+        // Recuperar a largura real do frame pós-trimming (se cadastrado) ou assumir a do bitmap
+        val fw = spriteFrameWidths[bitmap] ?: bitmap.width
+        val fh = bitmap.height
+        
+        val totalFrames = max(1, bitmap.width / fw)
         val currentFrame = animIndex % totalFrames
         
-        val destW = 38f * scale * sizeMultiplier
-        val destH = 38f * scale * sizeMultiplier
+        // Calcular largura proporcional à altura de referência desejada
+        val destH = refHeight * scale
+        val destW = destH * (fw.toFloat() / fh.toFloat())
         
         val dstX = center.x - destW / 2
         val dstY = center.y - destH / 2
@@ -447,8 +540,8 @@ fun DrawScope.drawIsoSpriteBitmap(
         
         drawImage(
             image = bitmap,
-            srcOffset = androidx.compose.ui.unit.IntOffset(currentFrame * frameWidth, 0),
-            srcSize = androidx.compose.ui.unit.IntSize(frameWidth, frameHeight),
+            srcOffset = androidx.compose.ui.unit.IntOffset(currentFrame * fw, 0),
+            srcSize = androidx.compose.ui.unit.IntSize(fw, fh),
             dstOffset = androidx.compose.ui.unit.IntOffset(dstX.toInt(), dstY.toInt()),
             dstSize = androidx.compose.ui.unit.IntSize(destW.toInt(), destH.toInt()),
             filterQuality = androidx.compose.ui.graphics.FilterQuality.None,
@@ -482,11 +575,9 @@ fun DrawScope.drawHeroSprite(
                 bitmap = bitmap,
                 center = center,
                 scale = scale,
-                frameWidth = 100,
-                frameHeight = 100,
+                refHeight = 48f,
                 animIndex = animIndex,
-                flashActive = hero.flashTicks > 0,
-                sizeMultiplier = 3.2f
+                flashActive = hero.flashTicks > 0
             )
             if (success) return
         }
@@ -576,26 +667,24 @@ fun DrawScope.drawMonsterSprite(
     }
 
     if (bitmap != null) {
-        val sizeMult = when {
-            name.startsWith("Orc") -> 1.5f
-            name.startsWith("Slime") -> 0.8f
-            name.startsWith("Lobo") -> 1.2f
-            name.startsWith("Goblin") -> 1.1f
-            name.startsWith("Coleta de Madeira") -> 1.6f
-            name.startsWith("Coleta de Pedra") -> 1.2f
-            name.startsWith("Coleta de Ervas") -> 0.9f
-            name.startsWith("Coleta de Ferro") -> 1.3f
-            else -> 1.0f
+        val refH = when {
+            name.startsWith("Orc") -> 52f
+            name.startsWith("Slime") -> 28f
+            name.startsWith("Lobo") -> 44f
+            name.startsWith("Goblin") -> 40f
+            name.startsWith("Coleta de Madeira") -> 70f
+            name.startsWith("Coleta de Pedra") -> 50f
+            name.startsWith("Coleta de Ervas") -> 38f
+            name.startsWith("Coleta de Ferro") -> 52f
+            else -> 48f
         }
         val success = drawIsoSpriteBitmap(
             bitmap = bitmap,
             center = center,
             scale = scale,
-            frameWidth = if (name.startsWith("Orc")) 100 else bitmap.width,
-            frameHeight = if (name.startsWith("Orc")) 100 else bitmap.height,
+            refHeight = refH,
             animIndex = if (name.startsWith("Orc")) animIndex else 0,
-            flashActive = monster.flashTicks > 0,
-            sizeMultiplier = sizeMult
+            flashActive = monster.flashTicks > 0
         )
         if (success) return
     }
@@ -1060,10 +1149,8 @@ fun MapScreen(
                                             bitmap = newBlacksmith,
                                             center = Offset(isoPos.x, isoPos.y - 10f * scale),
                                             scale = scale,
-                                            frameWidth = newBlacksmith.width,
-                                            frameHeight = newBlacksmith.height,
-                                            animIndex = 0,
-                                            sizeMultiplier = 3.5f
+                                            refHeight = 75f,
+                                            animIndex = 0
                                         )
                                     } else {
                                         drawIsoBlacksmith(this, guildX, guildY, scale)
@@ -1090,10 +1177,8 @@ fun MapScreen(
                                             bitmap = newMerchant,
                                             center = Offset(isoPos.x, isoPos.y - 8f * scale),
                                             scale = scale,
-                                            frameWidth = newMerchant.width,
-                                            frameHeight = newMerchant.height,
-                                            animIndex = 0,
-                                            sizeMultiplier = 3.2f
+                                            refHeight = 70f,
+                                            animIndex = 0
                                         )
                                     } else {
                                         drawIsoMerchant(this, guildX, guildY, scale, merchantLvl)
@@ -1118,10 +1203,8 @@ fun MapScreen(
                                                     bitmap = newTree,
                                                     center = Offset(isoPos.x, isoPos.y - 20f * scale),
                                                     scale = scale,
-                                                    frameWidth = newTree.width,
-                                                    frameHeight = newTree.height,
-                                                    animIndex = 0,
-                                                    sizeMultiplier = 1.3f
+                                                    refHeight = 56f,
+                                                    animIndex = 0
                                                 )
                                             } else {
                                                 val treeColors = mapOf('T' to Color(0xFF283626), 'B' to Color(0xFF4E3629))
@@ -1145,10 +1228,8 @@ fun MapScreen(
                                                     bitmap = rockBmp,
                                                     center = Offset(isoPos.x, isoPos.y - 8f * scale),
                                                     scale = scale,
-                                                    frameWidth = rockBmp.width,
-                                                    frameHeight = rockBmp.height,
-                                                    animIndex = 0,
-                                                    sizeMultiplier = 1.1f
+                                                    refHeight = 44f,
+                                                    animIndex = 0
                                                 )
                                             } else {
                                                 val rockColors = mapOf('R' to Color(0xFF455A64), 'D' to Color(0xFF263238))
