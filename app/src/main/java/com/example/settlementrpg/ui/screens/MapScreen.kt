@@ -415,34 +415,34 @@ fun drawIsoCastle(scope: DrawScope, centerX: Float, centerY: Float, scale: Float
             center = Offset(mainPos.x, mainPos.y - 5f * scale)
         )
     } else if (level == 1) {
-        // Nível 1: Casebre rústico de madeira (Tenda)
+        // Nível 1: Casebre rústico de madeira (Tenda) - Altura total: 80f (Box 52f + Pirâmide 28f)
         val mainPos = toIsometric(300f, 300f, centerX, centerY, scale)
-        drawIsoBox(scope, mainPos.x, mainPos.y, 16f * scale, 22f * scale, woodLeft, woodRight, woodTop)
-        drawIsoPyramid(scope, mainPos.x, mainPos.y - 22f * scale, 16f * scale, 12f * scale, strawRoofLeft, strawRoof)
+        drawIsoBox(scope, mainPos.x, mainPos.y, 38f * scale, 52f * scale, woodLeft, woodRight, woodTop)
+        drawIsoPyramid(scope, mainPos.x, mainPos.y - 52f * scale, 38f * scale, 28f * scale, strawRoofLeft, strawRoof)
     } else if (level == 2) {
-        // Nível 2: Fortaleza básica de pedra
+        // Nível 2: Fortaleza básica de pedra - Altura total: 110f (Torre 82f + Pirâmide 28f)
         val mainPos = toIsometric(300f, 300f, centerX, centerY, scale)
-        drawIsoBox(scope, mainPos.x, mainPos.y, 20f * scale, 35f * scale, stoneLeft, stoneRight, stoneTop)
+        drawIsoBox(scope, mainPos.x, mainPos.y, 36f * scale, 64f * scale, stoneLeft, stoneRight, stoneTop)
         
         val leftPos = toIsometric(275f, 325f, centerX, centerY, scale)
-        drawIsoBox(scope, leftPos.x, leftPos.y, 14f * scale, 45f * scale, stoneLeft, stoneRight, stoneTop)
-        drawIsoPyramid(scope, leftPos.x, leftPos.y - 45f * scale, 14f * scale, 15f * scale, goldRoofLeft, goldRoof)
+        drawIsoBox(scope, leftPos.x, leftPos.y, 25f * scale, 82f * scale, stoneLeft, stoneRight, stoneTop)
+        drawIsoPyramid(scope, leftPos.x, leftPos.y - 82f * scale, 25f * scale, 28f * scale, goldRoofLeft, goldRoof)
     } else {
-        // Nível 3+: Castelo de 3 torres completo
+        // Nível 3+: Castelo de 3 torres completo - Altura total: 140f (Torre traseira 107f + Pirâmide 33f)
         val rearPos = toIsometric(275f, 275f, centerX, centerY, scale)
-        drawIsoBox(scope, rearPos.x, rearPos.y, 14f * scale, 65f * scale, stoneLeft, stoneRight, stoneTop)
-        drawIsoPyramid(scope, rearPos.x, rearPos.y - 65f * scale, 14f * scale, 20f * scale, goldRoofLeft, goldRoof)
+        drawIsoBox(scope, rearPos.x, rearPos.y, 23f * scale, 107f * scale, stoneLeft, stoneRight, stoneTop)
+        drawIsoPyramid(scope, rearPos.x, rearPos.y - 107f * scale, 23f * scale, 33f * scale, goldRoofLeft, goldRoof)
         
         val rightPos = toIsometric(325f, 275f, centerX, centerY, scale)
-        drawIsoBox(scope, rightPos.x, rightPos.y, 16f * scale, 55f * scale, stoneLeft, stoneRight, stoneTop)
-        drawIsoPyramid(scope, rightPos.x, rightPos.y - 55f * scale, 16f * scale, 18f * scale, goldRoofLeft, goldRoof)
+        drawIsoBox(scope, rightPos.x, rightPos.y, 26f * scale, 90f * scale, stoneLeft, stoneRight, stoneTop)
+        drawIsoPyramid(scope, rightPos.x, rightPos.y - 90f * scale, 26f * scale, 30f * scale, goldRoofLeft, goldRoof)
 
         val leftPos = toIsometric(275f, 325f, centerX, centerY, scale)
-        drawIsoBox(scope, leftPos.x, leftPos.y, 16f * scale, 55f * scale, stoneLeft, stoneRight, stoneTop)
-        drawIsoPyramid(scope, leftPos.x, leftPos.y - 55f * scale, 16f * scale, 18f * scale, goldRoofLeft, goldRoof)
+        drawIsoBox(scope, leftPos.x, leftPos.y, 26f * scale, 90f * scale, stoneLeft, stoneRight, stoneTop)
+        drawIsoPyramid(scope, leftPos.x, leftPos.y - 90f * scale, 26f * scale, 30f * scale, goldRoofLeft, goldRoof)
 
         val mainPos = toIsometric(300f, 300f, centerX, centerY, scale)
-        drawIsoBox(scope, mainPos.x, mainPos.y, 25f * scale, 45f * scale, stoneLeft, stoneRight, stoneTop)
+        drawIsoBox(scope, mainPos.x, mainPos.y, 41f * scale, 74f * scale, stoneLeft, stoneRight, stoneTop)
         
         val doorPath = androidx.compose.ui.graphics.Path().apply {
             moveTo(mainPos.x + 4f * scale, mainPos.y - 2f * scale)
@@ -668,10 +668,10 @@ fun DrawScope.drawMonsterSprite(
             name.startsWith("Slime") -> 28f
             name.startsWith("Lobo") -> 44f
             name.startsWith("Goblin") -> 40f
-            name.startsWith("Coleta de Madeira") -> 70f
-            name.startsWith("Coleta de Pedra") -> 50f
-            name.startsWith("Coleta de Ervas") -> 38f
-            name.startsWith("Coleta de Ferro") -> 52f
+            name.startsWith("Coleta de Madeira") -> 60f
+            name.startsWith("Coleta de Pedra") -> 45f
+            name.startsWith("Coleta de Ervas") -> 35f
+            name.startsWith("Coleta de Ferro") -> 48f
             else -> 48f
         }
         val success = drawIsoSpriteBitmap(
@@ -1108,9 +1108,10 @@ fun MapScreen(
                                     val guildWidth = guildLayout.size.width.toFloat()
                                     val guildHeight = guildLayout.size.height.toFloat()
                                     val textY = when (guildLvl) {
-                                        1 -> guildY - 45f * scale
-                                        2 -> guildY - 65f * scale
-                                        else -> guildY - 85f * scale
+                                        0 -> guildY - 20f * scale
+                                        1 -> guildY - 95f * scale
+                                        2 -> guildY - 125f * scale
+                                        else -> guildY - 155f * scale
                                     }
                                     
                                     val guildLabelWidth = guildWidth + 12f * scale
@@ -1145,7 +1146,7 @@ fun MapScreen(
                                             bitmap = newBlacksmith,
                                             center = Offset(isoPos.x, isoPos.y - 10f * scale),
                                             scale = scale,
-                                            refHeight = 75f,
+                                            refHeight = 64f,
                                             animIndex = 0
                                         )
                                     } else {
@@ -1173,7 +1174,7 @@ fun MapScreen(
                                             bitmap = newMerchant,
                                             center = Offset(isoPos.x, isoPos.y - 8f * scale),
                                             scale = scale,
-                                            refHeight = 70f,
+                                            refHeight = 60f,
                                             animIndex = 0
                                         )
                                     } else {
@@ -1199,7 +1200,7 @@ fun MapScreen(
                                                     bitmap = newTree,
                                                     center = Offset(isoPos.x, isoPos.y - 20f * scale),
                                                     scale = scale,
-                                                    refHeight = 56f,
+                                                    refHeight = 52f,
                                                     animIndex = 0
                                                 )
                                             } else {
