@@ -641,10 +641,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             ))
         }
 
+        val isMissionSuccess = hero.currentMissionId != null
         return hero.copy(
             gold = hero.gold + rewardGold,
             currentMissionId = null,
-            collectedMaterials = emptyMap()
+            collectedMaterials = emptyMap(),
+            missionsCompleted = if (isMissionSuccess) hero.missionsCompleted + 1 else hero.missionsCompleted
         )
     }
 
@@ -1144,9 +1146,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val buildingsStr = state.buildings.joinToString(";") { "${it.id}:${it.level}:${it.isUnlocked}" }
         editor.putString("buildings", buildingsStr)
 
-        // Heróis: id|nome|classe|level|xp|maxXp|hp|maxHp|attack|defense|gold|state|x|y|weaponName|armorName
+        // Heróis: id|nome|classe|level|xp|maxXp|hp|maxHp|attack|defense|gold|state|x|y|weaponName|armorName|missionsCompleted
         val heroesStr = state.heroes.joinToString(";") { h ->
-            "${h.id}|${h.name}|${h.heroClass.name}|${h.level}|${h.xp}|${h.maxXp}|${h.hp}|${h.maxHp}|${h.attack}|${h.defense}|${h.gold}|${h.state.name}|${h.x}|${h.y}|${h.weaponName}|${h.armorName}"
+            "${h.id}|${h.name}|${h.heroClass.name}|${h.level}|${h.xp}|${h.maxXp}|${h.hp}|${h.maxHp}|${h.attack}|${h.defense}|${h.gold}|${h.state.name}|${h.x}|${h.y}|${h.weaponName}|${h.armorName}|${h.missionsCompleted}"
         }
         editor.putString("heroes", heroesStr)
 
@@ -1313,7 +1315,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         targetX = 300f,
                         targetY = 300f,
                         weaponName = if (parts.size >= 16) parts[14] else "Punhal Básico",
-                        armorName = if (parts.size >= 16) parts[15] else "Trajes de Pano"
+                        armorName = if (parts.size >= 16) parts[15] else "Trajes de Pano",
+                        missionsCompleted = if (parts.size >= 17) parts[16].toInt() else 0
                     ))
                 }
             }

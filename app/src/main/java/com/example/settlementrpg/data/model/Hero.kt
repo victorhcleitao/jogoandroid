@@ -42,17 +42,18 @@ data class Hero(
     val armorName: String = "Trajes de Pano",
     val flashTicks: Int = 0,
     val prevX: Float = x,
-    val prevY: Float = y
+    val prevY: Float = y,
+    val missionsCompleted: Int = 0
 ) {
     val isDead: Boolean get() = hp <= 0f
 
     val rank: String get() = when {
-        level >= 7 -> "S"
-        level >= 6 -> "A"
-        level >= 5 -> "B"
-        level >= 4 -> "C"
-        level >= 3 -> "D"
-        level >= 2 -> "E"
+        level >= 7 && missionsCompleted >= 100 -> "S"
+        level >= 6 && missionsCompleted >= 75 -> "A"
+        level >= 5 && missionsCompleted >= 50 -> "B"
+        level >= 4 && missionsCompleted >= 30 -> "C"
+        level >= 3 && missionsCompleted >= 15 -> "D"
+        level >= 2 && missionsCompleted >= 5 -> "E"
         else -> "F"
     }
 

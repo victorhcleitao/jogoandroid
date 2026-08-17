@@ -496,7 +496,16 @@ fun GuildScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(text = "${hero.name} (Nível ${hero.level}) - [Rank ${hero.rank}]", color = TextWhite, fontWeight = FontWeight.Bold)
+                            val progressText = when (hero.rank) {
+                                "F" -> "${hero.missionsCompleted}/5 contr."
+                                "E" -> "${hero.missionsCompleted}/15 contr."
+                                "D" -> "${hero.missionsCompleted}/30 contr."
+                                "C" -> "${hero.missionsCompleted}/50 contr."
+                                "B" -> "${hero.missionsCompleted}/75 contr."
+                                "A" -> "${hero.missionsCompleted}/100 contr."
+                                else -> "${hero.missionsCompleted} contr."
+                            }
+                            Text(text = "${hero.name} (Nível ${hero.level}) - [Rank ${hero.rank} | $progressText]", color = TextWhite, fontWeight = FontWeight.Bold)
                             
                             val stateLabel = when(hero.state) {
                                 HeroState.IDLE -> "Ocioso"
