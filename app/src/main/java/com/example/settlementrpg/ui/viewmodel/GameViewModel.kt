@@ -485,11 +485,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 val availableMission = updatedMissions.find { m ->
                     if (!m.isPublished || m.assignedHeroId != null || m.isCompleted) return@find false
                     
-                    // Trava de Ranks
+                    // Trava de Ranks proporcional
                     val requiredRank = when (m.difficulty) {
-                        3 -> "B"
-                        2 -> "D"
-                        else -> "F"
+                        3 -> "D" // Orc (Dificuldade 3) exige Rank D (Lvl 3+)
+                        2 -> "E" // Goblin / Coleta de Ferro (Dificuldade 2) exige Rank E (Lvl 2+)
+                        else -> "F" // Slime / Lobo / Coletas Básicas (Dificuldade 1) exige Rank F (Lvl 1+)
                     }
                     val rankValue = when (hero.rank) {
                         "S" -> 6; "A" -> 5; "B" -> 4; "C" -> 3; "D" -> 2; "E" -> 1; else -> 0
@@ -581,6 +581,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    private fun deductGuildGold(amount: Int) {
+        _gameState.value = _gameState.value.copy(
+            gold = max(0, _gameState.value.gold - amount)
+        )
+    }
+
     private fun releaseMission(missionId: String) {
         val currentMissions = _gameState.value.missions
         val updated = currentMissions.map {
@@ -619,9 +625,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val rewardGold = mission?.goldReward ?: 0
         
         if (rewardGold > 0) {
+            deductGuildGold(rewardGold)
             logsToAdd.add(LogMessage(
                 id = UUID.randomUUID().toString(),
-                text = "Entrega: ${hero.name} entregou os espólios e recebeu a recompensa contratada de $rewardGold 🪙.",
+                text = "Entrega: ${hero.name} entregou os espólios e recebeu a recompensa de $rewardGold 🪙 do cofre da guilda.",
                 timestamp = System.currentTimeMillis(),
                 type = LogType.GUILD
             ))
@@ -1218,7 +1225,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
             val initialMissions = listOf(
                 Mission(UUID.randomUUID().toString(), "Caça de Treinamento", "Derrote Slimes nos arredores da guilda.", 1, "Slime Silvestre", 1, getContractRewardForMonster("Slime Silvestre"), 10, isPublished = true),
-                Mission(UUID.randomUUID().toString(), "Ameaça Lupina", "Um lobo selvagem foi visto perto do armazém.", 1, "Lobo da Floresta", 1, getContractRewardForMonster("Lobo da Floresta"), 15, isPublished = false)
+                Mission(UUID.randomUUID().toString(), "Ameaça Lupina", "Um lobo selvagem foi visto perto do armazém.", 1, "Lobo da Floresta", 1, getContractRewardForMonster("Lobo da Floresta"), 10, isPublished = true),
+                Mission(UUID.randomUUID().toString(), "Madeira para a Lareira", "Precisamos de lenha para aquecer a guilda.", 1, "Coleta de Madeira", 1, 1, 10, isPublished = true),
+                Mission(UUID.randomUUID().toString(), "Pedras de Fundação", "Traga blocos de pedra para pavimentar a entrada.", 1, "Coleta de Pedra", 1, 1, 10, isPublished = true),
+                Mission(UUID.randomUUID().toString(), "Ervas de Cura", "Colete ervas medicinais para preparar poções básicas.", 1, "Coleta de Ervas", 1, 2, 10, isPublished = true)
             )
 
             _gameState.value = GameState(
@@ -1384,7 +1394,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             missions.addAll(listOf(
                 Mission(UUID.randomUUID().toString(), "Caça de Treinamento", "Derrote Slimes nos arredores da guilda.", 1, "Slime Silvestre", 1, getContractRewardForMonster("Slime Silvestre"), 10, isPublished = true),
-                Mission(UUID.randomUUID().toString(), "Ameaça Lupina", "Um lobo selvagem foi visto perto do armazém.", 1, "Lobo da Floresta", 1, getContractRewardForMonster("Lobo da Floresta"), 15, isPublished = false)
+                Mission(UUID.randomUUID().toString(), "Ameaça Lupina", "Um lobo selvagem foi visto perto do armazém.", 1, "Lobo da Floresta", 1, getContractRewardForMonster("Lobo da Floresta"), 10, isPublished = true),
+                Mission(UUID.randomUUID().toString(), "Madeira para a Lareira", "Precisamos de lenha para aquecer a guilda.", 1, "Coleta de Madeira", 1, 1, 10, isPublished = true),
+                Mission(UUID.randomUUID().toString(), "Pedras de Fundação", "Traga blocos de pedra para pavimentar a entrada.", 1, "Coleta de Pedra", 1, 1, 10, isPublished = true),
+                Mission(UUID.randomUUID().toString(), "Ervas de Cura", "Colete ervas medicinais para preparar poções básicas.", 1, "Coleta de Ervas", 1, 2, 10, isPublished = true)
             ))
         }
 
