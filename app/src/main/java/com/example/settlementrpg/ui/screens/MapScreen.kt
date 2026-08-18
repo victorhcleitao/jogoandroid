@@ -230,11 +230,17 @@ fun loadImageFromAssets(context: Context, path: String): ImageBitmap? {
         val defaultFrameW = when {
             path.contains("guerreiro", ignoreCase = true) -> 100
             path.contains("orc_", ignoreCase = true) -> 100
+            path.contains("maga", ignoreCase = true) -> 100
+            path.contains("arqueiro", ignoreCase = true) -> 100
+            path.contains("cleriga", ignoreCase = true) -> 100
             else -> originalBitmap.width
         }
         val defaultFrameH = when {
             path.contains("guerreiro", ignoreCase = true) -> 100
             path.contains("orc_", ignoreCase = true) -> 100
+            path.contains("maga", ignoreCase = true) -> 100
+            path.contains("arqueiro", ignoreCase = true) -> 100
+            path.contains("cleriga", ignoreCase = true) -> 100
             else -> originalBitmap.height
         }
         
@@ -558,25 +564,61 @@ fun DrawScope.drawHeroSprite(
     warriorIdle: ImageBitmap?,
     warriorWalk: ImageBitmap?,
     warriorAttack: ImageBitmap?,
-    warriorDeath: ImageBitmap?
+    warriorDeath: ImageBitmap?,
+    mageIdle: ImageBitmap? = null,
+    mageWalk: ImageBitmap? = null,
+    mageAttack: ImageBitmap? = null,
+    mageDeath: ImageBitmap? = null,
+    archerIdle: ImageBitmap? = null,
+    archerWalk: ImageBitmap? = null,
+    archerAttack: ImageBitmap? = null,
+    archerDeath: ImageBitmap? = null,
+    clericIdle: ImageBitmap? = null,
+    clericWalk: ImageBitmap? = null,
+    clericAttack: ImageBitmap? = null,
+    clericDeath: ImageBitmap? = null
 ) {
-    if (hero.heroClass == HeroClass.WARRIOR) {
-        val bitmap = when (hero.state) {
-            HeroState.COMBAT -> warriorAttack
-            HeroState.WALKING_TO_MONSTER, HeroState.WALKING_TO_GUILD -> warriorWalk
-            else -> warriorIdle
+    val bitmap = when (hero.heroClass) {
+        HeroClass.WARRIOR -> {
+            when (hero.state) {
+                HeroState.COMBAT -> warriorAttack
+                HeroState.WALKING_TO_MONSTER, HeroState.WALKING_TO_GUILD -> warriorWalk
+                else -> warriorIdle
+            }
         }
-        if (bitmap != null) {
-            val success = drawIsoSpriteBitmap(
-                bitmap = bitmap,
-                center = center,
-                scale = scale,
-                refHeight = 48f,
-                animIndex = animIndex,
-                flashActive = hero.flashTicks > 0
-            )
-            if (success) return
+        HeroClass.MAGE -> {
+            when (hero.state) {
+                HeroState.COMBAT -> mageAttack
+                HeroState.WALKING_TO_MONSTER, HeroState.WALKING_TO_GUILD -> mageWalk
+                else -> mageIdle
+            }
         }
+        HeroClass.ARCHER -> {
+            when (hero.state) {
+                HeroState.COMBAT -> archerAttack
+                HeroState.WALKING_TO_MONSTER, HeroState.WALKING_TO_GUILD -> archerWalk
+                else -> archerIdle
+            }
+        }
+        HeroClass.CLERIG -> {
+            when (hero.state) {
+                HeroState.COMBAT -> clericAttack
+                HeroState.WALKING_TO_MONSTER, HeroState.WALKING_TO_GUILD -> clericWalk
+                else -> clericIdle
+            }
+        }
+    }
+    
+    if (bitmap != null) {
+        val success = drawIsoSpriteBitmap(
+            bitmap = bitmap,
+            center = center,
+            scale = scale,
+            refHeight = 48f,
+            animIndex = animIndex,
+            flashActive = hero.flashTicks > 0
+        )
+        if (success) return
     }
     
     val (sprite, colorMap) = when (hero.heroClass) {
@@ -624,7 +666,8 @@ fun DrawScope.drawMonsterSprite(
     goblinIdle: ImageBitmap?,
     goblinDeath: ImageBitmap?,
     newTree: ImageBitmap?,
-    newStone: ImageBitmap?
+    newStone: ImageBitmap?,
+    newHerbs: ImageBitmap? = null
 ) {
     val name = monster.name
     val isDead = monster.isDead
@@ -654,7 +697,7 @@ fun DrawScope.drawMonsterSprite(
             if (isDead) null else newStone
         }
         name.startsWith("Coleta de Ervas") -> {
-            if (isDead) null else newTree
+            if (isDead) null else newHerbs ?: newTree
         }
         name.startsWith("Coleta de Ferro") -> {
             if (isDead) null else newStone
@@ -838,6 +881,24 @@ fun MapScreen(
     val newMerchant = remember { loadImageFromAssets(context, "sprites/ambiente/merchant_new.png") }
     val newBlacksmith = remember { loadImageFromAssets(context, "sprites/ambiente/blacksmith_new.png") }
 
+    val mageIdle = remember { loadImageFromAssets(context, "sprites/herois/maga_idle.png") }
+    val mageWalk = remember { loadImageFromAssets(context, "sprites/herois/maga_walk.png") }
+    val mageAttack = remember { loadImageFromAssets(context, "sprites/herois/maga_attack.png") }
+    val mageDeath = remember { loadImageFromAssets(context, "sprites/herois/maga_death.png") }
+
+    val archerIdle = remember { loadImageFromAssets(context, "sprites/herois/arqueiro_idle.png") }
+    val archerWalk = remember { loadImageFromAssets(context, "sprites/herois/arqueiro_walk.png") }
+    val archerAttack = remember { loadImageFromAssets(context, "sprites/herois/arqueiro_attack.png") }
+    val archerDeath = remember { loadImageFromAssets(context, "sprites/herois/arqueiro_death.png") }
+
+    val clericIdle = remember { loadImageFromAssets(context, "sprites/herois/cleriga_idle.png") }
+    val clericWalk = remember { loadImageFromAssets(context, "sprites/herois/cleriga_walk.png") }
+    val clericAttack = remember { loadImageFromAssets(context, "sprites/herois/cleriga_attack.png") }
+    val clericDeath = remember { loadImageFromAssets(context, "sprites/herois/cleriga_death.png") }
+
+    val mapBackground = remember { loadImageFromAssets(context, "sprites/ambiente/map_background.png") }
+    val newHerbs = remember { loadImageFromAssets(context, "sprites/ambiente/herbs.png") }
+
     Card(
         modifier = modifier.fillMaxSize(),
         colors = CardDefaults.cardColors(containerColor = DarkSurface),
@@ -896,13 +957,21 @@ fun MapScreen(
                     val guildX = canvasWidth / 2
                     val guildY = canvasHeight / 2
 
-                    // 1. Fundo com Gradiente Radial (Desenhado fora do transform para preencher sempre toda a tela)
-                    val bgBrush = Brush.radialGradient(
-                        colors = listOf(Color(0xFF131B2B), Color(0xFF060709)),
-                        center = Offset(guildX, guildY),
-                        radius = 450f * scale
-                    )
-                    drawRect(brush = bgBrush, size = size)
+                    // 1. Fundo (Imagem se disponível, senão fallback com Gradiente Radial)
+                    if (mapBackground != null) {
+                        drawImage(
+                            image = mapBackground,
+                            dstSize = androidx.compose.ui.unit.IntSize(canvasWidth.toInt(), canvasHeight.toInt()),
+                            filterQuality = androidx.compose.ui.graphics.FilterQuality.None
+                        )
+                    } else {
+                        val bgBrush = Brush.radialGradient(
+                            colors = listOf(Color(0xFF131B2B), Color(0xFF060709)),
+                            center = Offset(guildX, guildY),
+                            radius = 450f * scale
+                        )
+                        drawRect(brush = bgBrush, size = size)
+                    }
 
                     // Aplicar transformações globais no Canvas baseadas no Zoom e Pan
                     withTransform({
@@ -1284,7 +1353,19 @@ fun MapScreen(
                                         warriorIdle = warriorIdle,
                                         warriorWalk = warriorWalk,
                                         warriorAttack = warriorAttack,
-                                        warriorDeath = warriorDeath
+                                        warriorDeath = warriorDeath,
+                                        mageIdle = mageIdle,
+                                        mageWalk = mageWalk,
+                                        mageAttack = mageAttack,
+                                        mageDeath = mageDeath,
+                                        archerIdle = archerIdle,
+                                        archerWalk = archerWalk,
+                                        archerAttack = archerAttack,
+                                        archerDeath = archerDeath,
+                                        clericIdle = clericIdle,
+                                        clericWalk = clericWalk,
+                                        clericAttack = clericAttack,
+                                        clericDeath = clericDeath
                                     )
 
                                     // Barra HP
@@ -1373,7 +1454,8 @@ fun MapScreen(
                                         goblinIdle = goblinIdle,
                                         goblinDeath = goblinDeath,
                                         newTree = newTree,
-                                        newStone = newStone
+                                        newStone = newStone,
+                                        newHerbs = newHerbs
                                     )
 
                                     if (!monster.isDead) {
