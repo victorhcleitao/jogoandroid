@@ -4,7 +4,7 @@ plugins {
   alias(libs.plugins.kotlin.serialization)
 }
 
-val appVersionName = "1.0"
+val appVersionName = "0.1.0"
 
 android {
     namespace = "com.example.settlementrpg"
