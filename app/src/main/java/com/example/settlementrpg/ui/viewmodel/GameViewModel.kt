@@ -421,6 +421,24 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                                 updatedHeroes[i] = hero.copy(flashTicks = 1)
                             }
                         }
+                    } else {
+                        // O alvo já está morto!
+                        logsToAdd.add(LogMessage(
+                            id = UUID.randomUUID().toString(),
+                            text = "Aviso: O alvo de ${hero.name} foi derrotado. Retornando à guilda.",
+                            timestamp = System.currentTimeMillis(),
+                            type = LogType.GUILD
+                        ))
+                        if (hero.currentMissionId != null) {
+                            releaseMission(hero.currentMissionId)
+                        }
+                        updatedHeroes[i] = hero.copy(
+                            state = HeroState.WALKING_TO_GUILD,
+                            targetX = 300f,
+                            targetY = 300f,
+                            targetMonsterId = null,
+                            currentMissionId = null
+                        )
                     }
                 } else {
                     // Monstro sumiu/inválido
