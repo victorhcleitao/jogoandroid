@@ -4,6 +4,8 @@ plugins {
   alias(libs.plugins.kotlin.serialization)
 }
 
+val appVersionName = "1.0"
+
 android {
     namespace = "com.example.settlementrpg"
     compileSdk = 36
@@ -12,7 +14,7 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0"
+        versionName = appVersionName
     }
 
     buildTypes {
@@ -82,4 +84,8 @@ dependencies {
   implementation(libs.androidx.navigation3.ui)
   implementation(libs.androidx.navigation3.runtime)
   implementation(libs.androidx.lifecycle.viewmodel.navigation3)
+}
+
+base {
+    archivesName.set("guildkeeper-v$appVersionName")
 }
