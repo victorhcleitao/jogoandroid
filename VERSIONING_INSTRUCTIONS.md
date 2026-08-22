@@ -10,8 +10,8 @@ O nome do arquivo APK gerado pelo Gradle é padronizado automaticamente com base
 
 `guildkeeper-v<VersionName>-<BuildType>.apk`
 
-*   **Debug (Desenvolvimento):** `guildkeeper-v1.0-debug.apk`
-*   **Release (Produção):** `guildkeeper-v1.0-release.apk`
+*   **Debug (Desenvolvimento):** `guildkeeper-v0.1.0-debug.apk`
+*   **Release (Produção):** `guildkeeper-v0.1.0-release.apk`
 
 ---
 
@@ -20,9 +20,9 @@ O nome do arquivo APK gerado pelo Gradle é padronizado automaticamente com base
 Sempre que preparar uma nova versão do jogo, siga estes passos:
 
 1.  Abra o arquivo [`app/build.gradle.kts`](file:///c:/projetos/Guildkeeper/app/build.gradle.kts).
-2.  Altere a constante `appVersionName` (ex: de `"1.0"` para `"1.0.1"`):
+2.  Altere a constante `appVersionName` (ex: de `"0.1.0"` para `"0.1.1"`):
     ```kotlin
-    val appVersionName = "1.0.1"
+    val appVersionName = "0.1.1"
     ```
 3.  No bloco `defaultConfig`, incremente o valor de `versionCode` em `1`:
     ```kotlin
@@ -51,14 +51,15 @@ O APK gerado para distribuição deve ser copiado para a pasta `/APK` na raiz do
 
 ## 🏷️ 4. Etiquetando Versões no Git (Git Tags)
 
-Ao atingir uma versão estável e pronta, crie uma Tag Git correspondente à versão especificada em `versionName`:
+Durante a fase de desenvolvimento, use tags no formato `v0.x.x` (ex: `v0.1.0`):
 
 ```bash
 # 1. Crie a tag localmente
-git tag -a v1.0.0 -m "Release v1.0.0 - Correção de softlock no combate e novos sprites"
+git tag -a v0.1.0 -m "Release v0.1.0 - Correção de softlock no combate e novos sprites"
 
 # 2. Envie a tag para o GitHub
-git push origin v1.0.0
+git push origin v0.1.0
 ```
 
-Isso criará uma release histórica no GitHub facilitando o rastreamento do progresso do projeto.
+Quando o jogo for oficialmente lançado de forma completa, a numeração passará a seguir o padrão `v1.0.0`, `v1.0.1`, etc.
+
