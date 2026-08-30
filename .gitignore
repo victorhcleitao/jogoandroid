@@ -13,3 +13,9 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Packs de sprites de referência (binários grandes, não fazem parte do código)
+/docs/sprites_source/
+
+# APKs gerados (usar docs/releases apenas localmente)
+/docs/releases/
