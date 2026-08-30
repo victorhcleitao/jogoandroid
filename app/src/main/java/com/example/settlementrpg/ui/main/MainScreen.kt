@@ -1,6 +1,7 @@
 package com.example.settlementrpg.ui.main
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
@@ -11,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -31,6 +33,7 @@ fun MainScreen(
 ) {
     val gameState by viewModel.gameState.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableStateOf(0) }
+    val isDebugMode = viewModel.isDebugMode
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -44,12 +47,17 @@ fun MainScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Guildkeeper",
-                    color = GoldPrimary,
+                    text = if (isDebugMode) "Guildkeeper (DEBUG)" else "Guildkeeper",
+                    color = if (isDebugMode) Color(0xFFFFD700) else GoldPrimary,
                     fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.pointerInput(Unit) {
+                        detectTapGestures(
+                            onLongPress = { viewModel.toggleDebugMode() }
+                        )
+                    }
                 )
-                
+
                 // Recursos Rápidos Globais
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -102,7 +110,7 @@ fun MainScreen(
                 .background(DarkBackground)
         ) {
             when (selectedTab) {
-                0 -> MapScreen(gameState = gameState, modifier = Modifier.fillMaxSize())
+                0 -> MapScreen(gameState = gameState, isDebugMode = isDebugMode, modifier = Modifier.fillMaxSize())
                 1 -> GuildScreen(
                     gameState = gameState,
                     onUpgradeBuilding = { viewModel.upgradeBuilding(it) },

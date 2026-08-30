@@ -654,8 +654,6 @@ fun DrawScope.drawMonsterSprite(
     center: Offset,
     scale: Float,
     animIndex: Int,
-    orcIdle: ImageBitmap?,
-    orcWalk: ImageBitmap?,
     orcAttack: ImageBitmap?,
     orcDeath: ImageBitmap?,
     orcIdleNew: ImageBitmap?,
@@ -671,14 +669,13 @@ fun DrawScope.drawMonsterSprite(
 ) {
     val name = monster.name
     val isDead = monster.isDead
-    
+
     val bitmap: ImageBitmap? = when {
         name.startsWith("Orc") -> {
-            val baseIdle = orcIdleNew ?: orcIdle
             when {
                 isDead -> orcDeath
                 monster.hp < monster.maxHp * 0.9f && animIndex % 2 == 0 -> orcAttack
-                else -> baseIdle
+                else -> orcIdleNew
             }
         }
         name.startsWith("Slime") -> {
@@ -787,7 +784,8 @@ sealed class IsoDrawable(val x: Float, val y: Float) {
 @Composable
 fun MapScreen(
     gameState: GameState,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isDebugMode: Boolean = false
 ) {
     // --- ESTADOS MUTÁVEIS PARA ZOOM E PAN ---
     var zoom by remember { mutableStateOf(1f) }
@@ -824,6 +822,27 @@ fun MapScreen(
     )
     val frameIndex = frameFloat.toInt()
 
+    // --- FPS COUNTER (DEBUG) ---
+    var currentFps by remember { mutableStateOf(0) }
+    var lastFrameTime by remember { mutableStateOf(System.currentTimeMillis()) }
+    var frameCount by remember { mutableStateOf(0) }
+    LaunchedEffect(isDebugMode) {
+        if (isDebugMode) {
+            while (true) {
+                withFrameMillis {
+                    val now = System.currentTimeMillis()
+                    frameCount++
+                    val elapsedMs = now - lastFrameTime
+                    if (elapsedMs >= 1000L) {
+                        currentFps = frameCount
+                        frameCount = 0
+                        lastFrameTime = now
+                    }
+                }
+            }
+        }
+    }
+
     // Elementos decorativos (apenas árvores e rochas - tochas são geradas dinamicamente!)
     val decors = remember {
         listOf(
@@ -858,8 +877,6 @@ fun MapScreen(
     val warriorAttack = remember { loadImageFromAssets(context, "sprites/herois/guerreiro_attack.png") }
     val warriorDeath = remember { loadImageFromAssets(context, "sprites/herois/guerreiro_death.png") }
     
-    val orcIdle = remember { loadImageFromAssets(context, "sprites/monstros/orc_idle.png") }
-    val orcWalk = remember { loadImageFromAssets(context, "sprites/monstros/orc_walk.png") }
     val orcAttack = remember { loadImageFromAssets(context, "sprites/monstros/orc_attack.png") }
     val orcDeath = remember { loadImageFromAssets(context, "sprites/monstros/orc_death.png") }
     val orcIdleNew = remember { loadImageFromAssets(context, "sprites/monstros/orc_idle_new.png") }
@@ -870,12 +887,10 @@ fun MapScreen(
     val wolfDeath = remember { loadImageFromAssets(context, "sprites/monstros/wolf_death.png") }
     val goblinIdle = remember { loadImageFromAssets(context, "sprites/monstros/goblin_idle.png") }
     val goblinDeath = remember { loadImageFromAssets(context, "sprites/monstros/goblin_death.png") }
-    
+
     val campfire1 = remember { loadImageFromAssets(context, "sprites/ambiente/campfire_1.png") }
     val campfire2 = remember { loadImageFromAssets(context, "sprites/ambiente/campfire_2.png") }
-    
-    val stone1 = remember { loadImageFromAssets(context, "sprites/ambiente/stone_1.png") }
-    val stone2 = remember { loadImageFromAssets(context, "sprites/ambiente/stone_2.png") }
+
     val newStone = remember { loadImageFromAssets(context, "sprites/ambiente/stone_1_new.png") }
     val newTree = remember { loadImageFromAssets(context, "sprites/ambiente/tree_1.png") }
     val newMerchant = remember { loadImageFromAssets(context, "sprites/ambiente/merchant_new.png") }
@@ -1288,7 +1303,7 @@ fun MapScreen(
                                                 topLeft = Offset(isoPos.x - 14f * scale, isoPos.y - 6f * scale),
                                                 size = androidx.compose.ui.geometry.Size(28f * scale, 12f * scale)
                                             )
-                                            val rockBmp = if ((drawable.decorX.toInt() + drawable.decorY.toInt()) % 2 == 0) (newStone ?: stone1) else stone2
+                                            val rockBmp = newStone
                                             if (rockBmp != null) {
                                                 drawIsoSpriteBitmap(
                                                     bitmap = rockBmp,
@@ -1442,8 +1457,6 @@ fun MapScreen(
                                         center = Offset(isoPos.x, spriteY),
                                         scale = scale,
                                         animIndex = frameIndex,
-                                        orcIdle = orcIdle,
-                                        orcWalk = orcWalk,
                                         orcAttack = orcAttack,
                                         orcDeath = orcDeath,
                                         orcIdleNew = orcIdleNew,
@@ -1543,6 +1556,83 @@ fun MapScreen(
                                 topLeft = Offset(ftX - 10f, ftY)
                             )
                         }
+
+                        // 10. Debug — Dimensões de sprite em pixels na tela
+                        if (isDebugMode) {
+                            val debugColor = Color(0xFFFFFF00)
+                            val debugStyle = TextStyle(color = debugColor, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+
+                            // Guilda
+                            val guildHeightPx = when (guildLvl) {
+                                0 -> (10f * scale * zoom).toInt()
+                                1 -> (80f * scale * zoom).toInt()
+                                2 -> (110f * scale * zoom).toInt()
+                                else -> (140f * scale * zoom).toInt()
+                            }
+                            drawText(textMeasurer = textMeasurer, text = "Guilda: ${guildHeightPx}px", style = debugStyle,
+                                topLeft = Offset(guildX + 8f, guildY - guildHeightPx))
+
+                            // Ferraria e Mercador (refHeight usados em drawIsoSpriteBitmap)
+                            if (blacksmithLvl > 0) {
+                                val bsIso = toIsometric(250f, 330f, guildX, guildY, scale)
+                                val bsH = (64f * scale * zoom).toInt()
+                                drawText(textMeasurer = textMeasurer, text = "Ferraria: ${bsH}px", style = debugStyle,
+                                    topLeft = Offset(bsIso.x + 8f, bsIso.y - bsH))
+                            }
+                            if (merchantLvl > 0) {
+                                val mcIso = toIsometric(350f, 330f, guildX, guildY, scale)
+                                val mcH = (60f * scale * zoom).toInt()
+                                drawText(textMeasurer = textMeasurer, text = "Mercador: ${mcH}px", style = debugStyle,
+                                    topLeft = Offset(mcIso.x + 8f, mcIso.y - mcH))
+                            }
+
+                            // Heróis
+                            gameState.heroes.forEach { hero ->
+                                val visualX = hero.prevX + (hero.x - hero.prevX) * fraction
+                                val visualY = hero.prevY + (hero.y - hero.prevY) * fraction
+                                val heroIso = toIsometric(visualX, visualY, guildX, guildY, scale)
+                                val heroH = (48f * scale * zoom).toInt()
+                                drawText(textMeasurer = textMeasurer, text = "${hero.name}: ${heroH}px", style = debugStyle,
+                                    topLeft = Offset(heroIso.x + 12f, heroIso.y - heroH - 15f))
+                            }
+
+                            // Monstros (refHeight varia por tipo)
+                            gameState.monsters.filter { !it.isDead }.forEach { monster ->
+                                val mIso = toIsometric(monster.x, monster.y, guildX, guildY, scale)
+                                val mRefH = when {
+                                    monster.name.startsWith("Orc") -> 52f
+                                    monster.name.startsWith("Slime") -> 28f
+                                    monster.name.startsWith("Lobo") -> 44f
+                                    monster.name.startsWith("Goblin") -> 40f
+                                    else -> 48f
+                                }
+                                val mH = (mRefH * scale * zoom).toInt()
+                                drawText(textMeasurer = textMeasurer, text = "${monster.name.substringBefore(" ")}: ${mH}px", style = debugStyle,
+                                    topLeft = Offset(mIso.x + 14f, mIso.y - mH - 20f))
+                            }
+                        }
+                    }
+
+                    // Debug — Painel FPS e Tick (fixo no canto superior esquerdo, fora do withTransform)
+                    if (isDebugMode) {
+                        val tickDeltaMs = System.currentTimeMillis() - gameState.lastTickTime
+                        val debugText = "FPS: $currentFps  |  Tick: ${tickDeltaMs}ms"
+                        val bgPadding = 6f
+                        val debugLayout = textMeasurer.measure(
+                            text = debugText,
+                            style = TextStyle(color = Color(0xFFFFFF00), fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                            softWrap = false
+                        )
+                        drawRoundRect(
+                            color = Color.Black.copy(alpha = 0.75f),
+                            topLeft = Offset(8f - bgPadding, 8f - bgPadding),
+                            size = androidx.compose.ui.geometry.Size(
+                                debugLayout.size.width + bgPadding * 2,
+                                debugLayout.size.height + bgPadding * 2
+                            ),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(4f)
+                        )
+                        drawText(textLayoutResult = debugLayout, topLeft = Offset(8f, 8f))
                     }
                 }
             }

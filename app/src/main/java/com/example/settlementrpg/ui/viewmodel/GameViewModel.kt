@@ -2,6 +2,9 @@ package com.example.settlementrpg.ui.viewmodel
 
 import android.app.Application
 import android.content.Context
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.settlementrpg.data.model.*
@@ -18,6 +21,14 @@ import kotlin.random.Random
 class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private val sharedPrefs = application.getSharedPreferences("settlement_rpg_prefs", Context.MODE_PRIVATE)
+
+    var isDebugMode by mutableStateOf(false)
+        private set
+
+    fun toggleDebugMode() {
+        isDebugMode = !isDebugMode
+        addLog("Modo Debug ${if (isDebugMode) "ATIVADO" else "DESATIVADO"}.", LogType.SYSTEM)
+    }
 
     private val _gameState = MutableStateFlow(GameState())
     val gameState: StateFlow<GameState> = _gameState.asStateFlow()
@@ -550,6 +561,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         if (activeMissionsCount < 4 && Random.nextFloat() < 0.25f) {
             val newMission = generateRandomMission(currentState.buildings.find { it.id == "guild" }?.level ?: 1)
             updatedMissions.add(newMission)
+            if (isDebugMode) {
+                logMissionFormula(newMission)
+            }
         }
 
         // Limpar logs antigos para economizar memória (manter últimos 100)
@@ -819,6 +833,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             gold = currentState.gold - mission.goldReward,
             missions = updated
         )
+        if (isDebugMode) {
+            logMissionFormula(mission)
+        }
         saveGame()
     }
 
@@ -1011,6 +1028,46 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         
         addLog("${hero.name} equipou ${getMaterialDisplayName(equipmentId)} da Oficina com bônus de Especialidade!", LogType.GUILD)
         saveGame()
+    }
+
+    private fun logMissionFormula(mission: Mission) {
+        val name = mission.targetMonsterName
+        val reward = mission.goldReward
+        
+        val formulaLog = when (name) {
+            "Coleta de Pedra" -> {
+                "[DEBUG] Fórmula Coleta de Pedra: Venda = 2g | Esperado = 2.0g | Fração = 50.0% | Final = 1g"
+            }
+            "Coleta de Madeira" -> {
+                "[DEBUG] Fórmula Coleta de Madeira: Venda = 2g | Esperado = 2.0g | Fração = 50.0% | Final = 1g"
+            }
+            "Coleta de Ervas" -> {
+                "[DEBUG] Fórmula Coleta de Ervas: Venda = 4g | Esperado = 4.0g | Fração = 50.0% | Final = 2g"
+            }
+            "Coleta de Ferro" -> {
+                "[DEBUG] Fórmula Coleta de Ferro: Venda = 12g | Esperado = 12.0g | Fração = 58.3% | Final = 7g"
+            }
+            else -> {
+                val prefix = name.substringBefore(" ")
+                val monster = _gameState.value.monsters.find { it.name.startsWith(prefix) }
+                if (monster != null) {
+                    var expectedValue = 0f
+                    val builder = StringBuilder()
+                    monster.lootTable.forEach { drop ->
+                        val sellValue = getMaterialSellValue(drop.materialId)
+                        val avgAmount = (drop.minAmount + drop.maxAmount) / 2.0f
+                        val contribution = drop.chance * avgAmount * sellValue
+                        expectedValue += contribution
+                        builder.append("${getMaterialDisplayName(drop.materialId)}(Chance:${(drop.chance * 100).toInt()}%, QtdMédia:${avgAmount}, Venda:${sellValue}g -> Contribuição:${String.format("%.2f", contribution)}g) ")
+                    }
+                    val fraction = if (monster.level == 1) 0.55f else 0.60f
+                    "[DEBUG] Fórmula Caça ($name): $builder| Esperado = ${String.format("%.2f", expectedValue)}g | Fração = ${String.format("%.1f", fraction * 100)}% | Final = ${reward}g"
+                } else {
+                    "[DEBUG] Fórmula Caça ($name): Monstro não encontrado | Final = ${reward}g"
+                }
+            }
+        }
+        addLog(formulaLog, LogType.SYSTEM)
     }
 
     private fun getContractRewardForMonster(monsterName: String): Int {
