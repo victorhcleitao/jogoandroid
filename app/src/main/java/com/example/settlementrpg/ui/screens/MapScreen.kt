@@ -871,48 +871,51 @@ fun MapScreen(
     val elapsed = timeMillis - lastTickTime
     val fraction = (elapsed.toFloat() / 1000f).coerceIn(0f, 1f)
 
+    // --- SPRITES (null = usa renderização procedural em pixel-art) ---
+    // Os sprites serão adicionados aqui conforme forem criados do zero
     val context = androidx.compose.ui.platform.LocalContext.current
-    val warriorIdle = remember { loadImageFromAssets(context, "sprites/herois/guerreiro_idle.png") }
-    val warriorWalk = remember { loadImageFromAssets(context, "sprites/herois/guerreiro_walk.png") }
-    val warriorAttack = remember { loadImageFromAssets(context, "sprites/herois/guerreiro_attack.png") }
-    val warriorDeath = remember { loadImageFromAssets(context, "sprites/herois/guerreiro_death.png") }
-    
-    val orcAttack = remember { loadImageFromAssets(context, "sprites/monstros/orc_attack.png") }
-    val orcDeath = remember { loadImageFromAssets(context, "sprites/monstros/orc_death.png") }
-    val orcIdleNew = remember { loadImageFromAssets(context, "sprites/monstros/orc_idle_new.png") }
 
-    val slimeIdle = remember { loadImageFromAssets(context, "sprites/monstros/slime_idle.png") }
-    val slimeDeath = remember { loadImageFromAssets(context, "sprites/monstros/slime_death.png") }
-    val wolfIdle = remember { loadImageFromAssets(context, "sprites/monstros/wolf_idle.png") }
-    val wolfDeath = remember { loadImageFromAssets(context, "sprites/monstros/wolf_death.png") }
-    val goblinIdle = remember { loadImageFromAssets(context, "sprites/monstros/goblin_idle.png") }
-    val goblinDeath = remember { loadImageFromAssets(context, "sprites/monstros/goblin_death.png") }
+    // Heróis — aguardando sprites originais
+    val warriorIdle: ImageBitmap? = null
+    val warriorWalk: ImageBitmap? = null
+    val warriorAttack: ImageBitmap? = null
+    val warriorDeath: ImageBitmap? = null
+    val mageIdle: ImageBitmap? = null
+    val mageWalk: ImageBitmap? = null
+    val mageAttack: ImageBitmap? = null
+    val mageDeath: ImageBitmap? = null
+    val archerIdle: ImageBitmap? = null
+    val archerWalk: ImageBitmap? = null
+    val archerAttack: ImageBitmap? = null
+    val archerDeath: ImageBitmap? = null
+    val clericIdle: ImageBitmap? = null
+    val clericWalk: ImageBitmap? = null
+    val clericAttack: ImageBitmap? = null
+    val clericDeath: ImageBitmap? = null
 
-    val campfire1 = remember { loadImageFromAssets(context, "sprites/ambiente/campfire_1.png") }
-    val campfire2 = remember { loadImageFromAssets(context, "sprites/ambiente/campfire_2.png") }
+    // Monstros — aguardando sprites originais
+    val orcAttack: ImageBitmap? = null
+    val orcDeath: ImageBitmap? = null
+    val orcIdleNew: ImageBitmap? = null
+    val slimeIdle: ImageBitmap? = null
+    val slimeDeath: ImageBitmap? = null
+    val wolfIdle: ImageBitmap? = null
+    val wolfDeath: ImageBitmap? = null
+    val goblinIdle: ImageBitmap? = null
+    val goblinDeath: ImageBitmap? = null
 
-    val newStone = remember { loadImageFromAssets(context, "sprites/ambiente/stone_1_new.png") }
-    val newTree = remember { loadImageFromAssets(context, "sprites/ambiente/tree_1.png") }
-    val newMerchant = remember { loadImageFromAssets(context, "sprites/ambiente/merchant_new.png") }
-    val newBlacksmith = remember { loadImageFromAssets(context, "sprites/ambiente/blacksmith_new.png") }
+    // Ambiente — aguardando sprites originais
+    val campfire1: ImageBitmap? = null
+    val campfire2: ImageBitmap? = null
+    val newStone: ImageBitmap? = null
+    val newTree: ImageBitmap? = null
+    val newMerchant: ImageBitmap? = null
+    val newBlacksmith: ImageBitmap? = null
+    val newHerbs: ImageBitmap? = null
 
-    val mageIdle = remember { loadImageFromAssets(context, "sprites/herois/maga_idle.png") }
-    val mageWalk = remember { loadImageFromAssets(context, "sprites/herois/maga_walk.png") }
-    val mageAttack = remember { loadImageFromAssets(context, "sprites/herois/maga_attack.png") }
-    val mageDeath = remember { loadImageFromAssets(context, "sprites/herois/maga_death.png") }
+    // Background e logo (mantidos)
+    val mapBackground: ImageBitmap? = null // removido asset de terceiro; usar gradiente procedural
 
-    val archerIdle = remember { loadImageFromAssets(context, "sprites/herois/arqueiro_idle.png") }
-    val archerWalk = remember { loadImageFromAssets(context, "sprites/herois/arqueiro_walk.png") }
-    val archerAttack = remember { loadImageFromAssets(context, "sprites/herois/arqueiro_attack.png") }
-    val archerDeath = remember { loadImageFromAssets(context, "sprites/herois/arqueiro_death.png") }
-
-    val clericIdle = remember { loadImageFromAssets(context, "sprites/herois/cleriga_idle.png") }
-    val clericWalk = remember { loadImageFromAssets(context, "sprites/herois/cleriga_walk.png") }
-    val clericAttack = remember { loadImageFromAssets(context, "sprites/herois/cleriga_attack.png") }
-    val clericDeath = remember { loadImageFromAssets(context, "sprites/herois/cleriga_death.png") }
-
-    val mapBackground = remember { loadImageFromAssets(context, "sprites/ambiente/map_background.png") }
-    val newHerbs = remember { loadImageFromAssets(context, "sprites/ambiente/herbs.png") }
 
     Card(
         modifier = modifier.fillMaxSize(),
