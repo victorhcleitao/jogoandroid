@@ -704,7 +704,7 @@ fun DrawScope.drawMonsterSprite(
 
     if (bitmap != null) {
         val refH = when {
-            name.startsWith("Orc") -> 52f
+            name.startsWith("Orc") -> 44f // ≤ 48f (heróis) — hierarquia: Monstros ≤ Heróis
             name.startsWith("Slime") -> 28f
             name.startsWith("Lobo") -> 44f
             name.startsWith("Goblin") -> 40f
@@ -843,7 +843,7 @@ fun MapScreen(
         }
     }
 
-    // Elementos decorativos (apenas árvores e rochas - tochas são geradas dinamicamente!)
+    // Elementos decorativos estáticos (árvores e rochas)
     val decors = remember {
         listOf(
             Triple(50f, 50f, "tree"), Triple(70f, 90f, "tree"), Triple(120f, 60f, "tree"),
@@ -851,12 +851,45 @@ fun MapScreen(
             Triple(80f, 520f, "tree"), Triple(500f, 520f, "tree"), Triple(530f, 480f, "tree"),
             Triple(80f, 250f, "tree"), Triple(530f, 280f, "tree"), Triple(220f, 520f, "tree"),
             Triple(380f, 60f, "tree"),
-            
+
             Triple(120f, 320f, "rock"), Triple(140f, 350f, "rock"), Triple(460f, 340f, "rock"),
             Triple(480f, 310f, "rock"), Triple(210f, 130f, "rock"), Triple(390f, 490f, "rock"),
             Triple(170f, 220f, "rock"), Triple(420f, 220f, "rock"), Triple(240f, 420f, "rock"),
             Triple(340f, 160f, "rock")
         )
+    }
+
+    // Tochas calculadas UMA VEZ por mudança na lista de monstros (não a cada frame).
+    // Chave: lista de IDs de monstros vivos — recalcula só quando um monstro aparece ou morre.
+    val torchDecors = remember(gameState.monsters.map { it.id to it.isDead }) {
+        val result = mutableListOf<Triple<Float, Float, String>>()
+        // Tochas fixas flanqueando a porta da Guilda
+        result.add(Triple(315f, 325f, "torch"))
+        result.add(Triple(325f, 315f, "torch"))
+        // Tochas flanqueando o spawn de cada monstro vivo
+        gameState.monsters.forEach { monster ->
+            if (!monster.isDead) {
+                val dx = monster.spawnX - 300f
+                val dy = monster.spawnY - 300f
+                val dist = Math.sqrt((dx * dx + dy * dy).toDouble())
+                if (dist > 0) {
+                    val spawnAngle = Math.atan2(dy.toDouble(), dx.toDouble())
+                    val perpAngle = spawnAngle + Math.PI / 2
+                    val offsetDist = 22f
+                    result.add(Triple(
+                        monster.spawnX + offsetDist * kotlin.math.cos(perpAngle).toFloat(),
+                        monster.spawnY + offsetDist * kotlin.math.sin(perpAngle).toFloat(),
+                        "torch"
+                    ))
+                    result.add(Triple(
+                        monster.spawnX - offsetDist * kotlin.math.cos(perpAngle).toFloat(),
+                        monster.spawnY - offsetDist * kotlin.math.sin(perpAngle).toFloat(),
+                        "torch"
+                    ))
+                }
+            }
+        }
+        result
     }
 
     // --- ENGENHA DE INTERPOLAÇÃO 60FPS DE MOVIMENTO ---
@@ -1100,35 +1133,8 @@ fun MapScreen(
                         if (tavernLvl > 0) drawables.add(IsoDrawable.TavernItem())
                         if (merchantLvl > 0) drawables.add(IsoDrawable.MerchantItem())
                         
-                        // Elementos decorativos (árvores e rochas)
-                        val activeDecors = decors.toMutableList()
-                        
-                        // Gerar e adicionar tochas flanking dinamicamente nas entradas (Guilda + Monstros ativos)
-                        // Flanquear porta da guilda
-                        activeDecors.add(Triple(315f, 325f, "torch"))
-                        activeDecors.add(Triple(325f, 315f, "torch"))
-                        
-                        // Flanquear spawns dos monstros ativos
-                        gameState.monsters.forEach { monster ->
-                            if (!monster.isDead) {
-                                val dx = monster.spawnX - 300f
-                                val dy = monster.spawnY - 300f
-                                val dist = Math.sqrt((dx * dx + dy * dy).toDouble())
-                                if (dist > 0) {
-                                    val spawnAngle = Math.atan2(dy.toDouble(), dx.toDouble())
-                                    val perpAngle = spawnAngle + Math.PI / 2
-                                    val offsetDist = 22f
-                                    
-                                    val t1x = monster.spawnX + offsetDist * kotlin.math.cos(perpAngle).toFloat()
-                                    val t1y = monster.spawnY + offsetDist * kotlin.math.sin(perpAngle).toFloat()
-                                    val t2x = monster.spawnX - offsetDist * kotlin.math.cos(perpAngle).toFloat()
-                                    val t2y = monster.spawnY - offsetDist * kotlin.math.sin(perpAngle).toFloat()
-                                    
-                                    activeDecors.add(Triple(t1x, t1y, "torch"))
-                                    activeDecors.add(Triple(t2x, t2y, "torch"))
-                                }
-                            }
-                        }
+                        // Elementos decorativos (estáticos + tochas estáveis por monstro)
+                        val activeDecors = decors + torchDecors
 
                         activeDecors.forEach { drawables.add(IsoDrawable.DecorItem(it.first, it.second, it.third)) }
                         gameState.monsters.forEach { drawables.add(IsoDrawable.MonsterItem(it)) }
@@ -1228,17 +1234,8 @@ fun MapScreen(
                                     )
                                 }
                                 is IsoDrawable.BlacksmithItem -> {
-                                    if (newBlacksmith != null) {
-                                        drawIsoSpriteBitmap(
-                                            bitmap = newBlacksmith,
-                                            center = Offset(isoPos.x, isoPos.y - 10f * scale),
-                                            scale = scale,
-                                            refHeight = 64f,
-                                            animIndex = 0
-                                        )
-                                    } else {
-                                        drawIsoBlacksmith(this, guildX, guildY, scale)
-                                    }
+                                    // Sprite bitmap: aguardando arte original (usa procedural até lá)
+                                    drawIsoBlacksmith(this, guildX, guildY, scale)
                                     drawText(
                                         textMeasurer = textMeasurer,
                                         text = "Ferraria Lvl $blacksmithLvl",
@@ -1256,17 +1253,8 @@ fun MapScreen(
                                     )
                                 }
                                 is IsoDrawable.MerchantItem -> {
-                                    if (newMerchant != null) {
-                                        drawIsoSpriteBitmap(
-                                            bitmap = newMerchant,
-                                            center = Offset(isoPos.x, isoPos.y - 8f * scale),
-                                            scale = scale,
-                                            refHeight = 60f,
-                                            animIndex = 0
-                                        )
-                                    } else {
-                                        drawIsoMerchant(this, guildX, guildY, scale, merchantLvl)
-                                    }
+                                    // Sprite bitmap: aguardando arte original (usa procedural até lá)
+                                    drawIsoMerchant(this, guildX, guildY, scale, merchantLvl)
                                     drawText(
                                         textMeasurer = textMeasurer,
                                         text = "Mercador Lvl $merchantLvl",
@@ -1603,7 +1591,7 @@ fun MapScreen(
                             gameState.monsters.filter { !it.isDead }.forEach { monster ->
                                 val mIso = toIsometric(monster.x, monster.y, guildX, guildY, scale)
                                 val mRefH = when {
-                                    monster.name.startsWith("Orc") -> 52f
+                                    monster.name.startsWith("Orc") -> 44f
                                     monster.name.startsWith("Slime") -> 28f
                                     monster.name.startsWith("Lobo") -> 44f
                                     monster.name.startsWith("Goblin") -> 40f
