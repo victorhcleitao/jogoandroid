@@ -1,27 +1,7 @@
 package com.example.settlementrpg.ui.main
 
-import com.example.settlementrpg.data.DataRepository
-import junit.framework.TestCase.assertEquals
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.test.runTest
-import org.junit.Test
-
-class MainScreenViewModelTest {
-  @Test
-  fun uiState_initiallyLoading() = runTest {
-    val viewModel = MainScreenViewModel(FakeMyModelRepository())
-    assertEquals(viewModel.uiState.first(), MainScreenUiState.Loading)
-  }
-
-  @Test
-  fun uiState_onItemSaved_isDisplayed() = runTest {
-    val viewModel = MainScreenViewModel(FakeMyModelRepository())
-    assertEquals(viewModel.uiState.first(), MainScreenUiState.Loading)
-  }
-}
-
-private class FakeMyModelRepository : DataRepository {
-  override val data: Flow<List<String>> = flow { emit(listOf("Sample")) }
-}
+// Arquivo de teste preservado por compatibilidade de diretório.
+// O ViewModel original (MainScreenViewModel) foi removido por ser código morto
+// (template do Android Studio sem uso no jogo).
+// Testes de regras de negócio do jogo estão em:
+//   ui/screens/SpriteHierarchyTest.kt

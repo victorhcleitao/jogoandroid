@@ -614,7 +614,7 @@ fun DrawScope.drawHeroSprite(
             bitmap = bitmap,
             center = center,
             scale = scale,
-            refHeight = 48f,
+            refHeight = SpriteHeights.HERO,
             animIndex = animIndex,
             flashActive = hero.flashTicks > 0
         )
@@ -704,15 +704,15 @@ fun DrawScope.drawMonsterSprite(
 
     if (bitmap != null) {
         val refH = when {
-            name.startsWith("Orc") -> 44f // ≤ 48f (heróis) — hierarquia: Monstros ≤ Heróis
-            name.startsWith("Slime") -> 28f
-            name.startsWith("Lobo") -> 44f
-            name.startsWith("Goblin") -> 40f
-            name.startsWith("Coleta de Madeira") -> 60f
-            name.startsWith("Coleta de Pedra") -> 45f
-            name.startsWith("Coleta de Ervas") -> 35f
-            name.startsWith("Coleta de Ferro") -> 48f
-            else -> 48f
+            name.startsWith("Orc")              -> SpriteHeights.ORC
+            name.startsWith("Slime")            -> SpriteHeights.SLIME
+            name.startsWith("Lobo")             -> SpriteHeights.LOBO
+            name.startsWith("Goblin")           -> SpriteHeights.GOBLIN
+            name.startsWith("Coleta de Madeira")-> SpriteHeights.COLETA_MADEIRA
+            name.startsWith("Coleta de Pedra")  -> SpriteHeights.COLETA_PEDRA
+            name.startsWith("Coleta de Ervas")  -> SpriteHeights.COLETA_ERVAS
+            name.startsWith("Coleta de Ferro")  -> SpriteHeights.COLETA_FERRO
+            else                                -> SpriteHeights.HERO
         }
         val success = drawIsoSpriteBitmap(
             bitmap = bitmap,
@@ -1275,7 +1275,7 @@ fun MapScreen(
                                                     bitmap = newTree,
                                                     center = Offset(isoPos.x, isoPos.y - 20f * scale),
                                                     scale = scale,
-                                                    refHeight = 52f,
+                                                    refHeight = SpriteHeights.DECOR_TREE,
                                                     animIndex = 0
                                                 )
                                             } else {
@@ -1300,7 +1300,7 @@ fun MapScreen(
                                                     bitmap = rockBmp,
                                                     center = Offset(isoPos.x, isoPos.y - 8f * scale),
                                                     scale = scale,
-                                                    refHeight = 44f,
+                                                    refHeight = SpriteHeights.DECOR_ROCK,
                                                     animIndex = 0
                                                 )
                                             } else {
@@ -1591,11 +1591,11 @@ fun MapScreen(
                             gameState.monsters.filter { !it.isDead }.forEach { monster ->
                                 val mIso = toIsometric(monster.x, monster.y, guildX, guildY, scale)
                                 val mRefH = when {
-                                    monster.name.startsWith("Orc") -> 44f
-                                    monster.name.startsWith("Slime") -> 28f
-                                    monster.name.startsWith("Lobo") -> 44f
-                                    monster.name.startsWith("Goblin") -> 40f
-                                    else -> 48f
+                                    monster.name.startsWith("Orc")    -> SpriteHeights.ORC
+                                    monster.name.startsWith("Slime")  -> SpriteHeights.SLIME
+                                    monster.name.startsWith("Lobo")   -> SpriteHeights.LOBO
+                                    monster.name.startsWith("Goblin") -> SpriteHeights.GOBLIN
+                                    else                              -> SpriteHeights.HERO
                                 }
                                 val mH = (mRefH * scale * zoom).toInt()
                                 drawText(textMeasurer = textMeasurer, text = "${monster.name.substringBefore(" ")}: ${mH}px", style = debugStyle,
