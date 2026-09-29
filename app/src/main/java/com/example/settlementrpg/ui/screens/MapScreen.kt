@@ -555,6 +555,33 @@ fun DrawScope.drawIsoSpriteBitmap(
     }
 }
 
+// --- SOMBRA ELÍPTICA DE SOLO ---
+/**
+ * Desenha uma sombra elíptica semitransparente no chão, imediatamente
+ * abaixo do pé de qualquer sprite. Usada antes de renderizar heróis,
+ * monstros, decoração e edifícios para ancorar visualmente cada entidade
+ * ao terreno (evita efeito "flutuando no espaço").
+ *
+ * @param footX    Centro horizontal do sprite em pixels de canvas
+ * @param footY    Posição Y do "pé" do sprite (base da hitbox visual)
+ * @param radiusW  Raio horizontal da elipse (proporcional ao tamanho do sprite)
+ * @param alpha    Opacidade da sombra (0f–1f)
+ */
+fun DrawScope.drawEllipticShadow(
+    footX: Float,
+    footY: Float,
+    radiusW: Float,
+    alpha: Float = 0.45f
+) {
+    val radiusH = radiusW * 0.35f  // proporção isométrica: largura ~3× a altura
+    drawOval(
+        color = Color(0xFF000000),
+        topLeft = Offset(footX - radiusW, footY - radiusH),
+        size = androidx.compose.ui.geometry.Size(radiusW * 2f, radiusH * 2f),
+        alpha = alpha
+    )
+}
+
 // --- RENDERIZADORES COM FALLBACK SE BITMAP NULO ---
 fun DrawScope.drawHeroSprite(
     hero: Hero,
@@ -1030,21 +1057,24 @@ fun MapScreen(
                         scale(zoom, zoom, pivot = Offset(guildX, guildY))
                     }) {
 
-                        // 2. Terreno
+                        // 2. Terreno — Tileset isométrico grama/terra com variação por hash
                         for (gx in 0 until 10) {
                             for (gy in 0 until 10) {
-                                val hash = (gx * 31 + gy * 17)
-                                val tileColor = when (hash % 4) {
-                                    0 -> Color(0xFF0D121D)
-                                    1 -> Color(0xFF0F1524)
-                                    2 -> Color(0xFF131B2A)
-                                    else -> Color(0xFF111722)
+                                val hash = (gx * 31 + gy * 17 + gx * gy) % 6
+                                // Paleta: verdes escuros (grama densa) + tons terra (caminhos)
+                                val tileColor = when (hash) {
+                                    0 -> Color(0xFF1B3A1F)  // Grama escura
+                                    1 -> Color(0xFF1F4223)  // Grama média
+                                    2 -> Color(0xFF1A3820)  // Grama mais escura
+                                    3 -> Color(0xFF17311C)  // Grama com sombra
+                                    4 -> Color(0xFF23451F)  // Grama clara
+                                    else -> Color(0xFF1C3D1F)  // Grama base
                                 }
                                 val p1 = toIsometric(gx * 60f, gy * 60f, guildX, guildY, scale)
                                 val p2 = toIsometric((gx + 1) * 60f, gy * 60f, guildX, guildY, scale)
                                 val p3 = toIsometric((gx + 1) * 60f, (gy + 1) * 60f, guildX, guildY, scale)
                                 val p4 = toIsometric(gx * 60f, (gy + 1) * 60f, guildX, guildY, scale)
-                                
+
                                 val tilePath = androidx.compose.ui.graphics.Path().apply {
                                     moveTo(p1.x, p1.y)
                                     lineTo(p2.x, p2.y)
@@ -1053,6 +1083,9 @@ fun MapScreen(
                                     close()
                                 }
                                 drawPath(tilePath, tileColor)
+
+                                // Borda sutil nos tiles para definir o grid isométrico
+                                drawPath(tilePath, Color(0x10000000), style = Stroke(width = 0.5f))
                             }
                         }
                         
@@ -1191,6 +1224,9 @@ fun MapScreen(
                             
                             when (drawable) {
                                 is IsoDrawable.GuildCastle -> {
+                                    // Sombra elíptica — raio cresce com o nível da Guilda
+                                    val guildShadowR = (24f + guildLvl * 8f) * scale
+                                    drawEllipticShadow(guildX, guildY, radiusW = guildShadowR, alpha = 0.55f)
                                     drawIsoCastle(this, guildX, guildY, scale, guildLvl)
                                     
                                     val guildLayout = textMeasurer.measure(
@@ -1234,6 +1270,7 @@ fun MapScreen(
                                     )
                                 }
                                 is IsoDrawable.BlacksmithItem -> {
+                                    drawEllipticShadow(isoPos.x, isoPos.y, radiusW = 18f * scale, alpha = 0.50f)
                                     // Sprite bitmap: aguardando arte original (usa procedural até lá)
                                     drawIsoBlacksmith(this, guildX, guildY, scale)
                                     drawText(
@@ -1244,6 +1281,7 @@ fun MapScreen(
                                     )
                                 }
                                 is IsoDrawable.TavernItem -> {
+                                    drawEllipticShadow(isoPos.x, isoPos.y, radiusW = 18f * scale, alpha = 0.50f)
                                     drawIsoTavern(this, guildX, guildY, scale)
                                     drawText(
                                         textMeasurer = textMeasurer,
@@ -1253,6 +1291,7 @@ fun MapScreen(
                                     )
                                 }
                                 is IsoDrawable.MerchantItem -> {
+                                    drawEllipticShadow(isoPos.x, isoPos.y, radiusW = 18f * scale, alpha = 0.50f)
                                     // Sprite bitmap: aguardando arte original (usa procedural até lá)
                                     drawIsoMerchant(this, guildX, guildY, scale, merchantLvl)
                                     drawText(
@@ -1334,11 +1373,7 @@ fun MapScreen(
                                 }
                                 is IsoDrawable.HeroItem -> {
                                     val hero = drawable.hero
-                                    drawOval(
-                                        color = Color(0x35000000),
-                                        topLeft = Offset(isoPos.x - 14f * scale, isoPos.y - 6f * scale),
-                                        size = androidx.compose.ui.geometry.Size(28f * scale, 12f * scale)
-                                    )
+                                    drawEllipticShadow(isoPos.x, isoPos.y, radiusW = 14f * scale)
                                     
                                     if (hero.state == HeroState.COMBAT) {
                                         drawOval(
@@ -1435,11 +1470,7 @@ fun MapScreen(
                                 }
                                 is IsoDrawable.MonsterItem -> {
                                     val monster = drawable.monster
-                                    drawOval(
-                                        color = Color(0x35000000),
-                                        topLeft = Offset(isoPos.x - 16f * scale, isoPos.y - 7f * scale),
-                                        size = androidx.compose.ui.geometry.Size(32f * scale, 14f * scale)
-                                    )
+                                    drawEllipticShadow(isoPos.x, isoPos.y, radiusW = 16f * scale)
                                     
                                     val spriteY = isoPos.y - 14f * scale
                                     

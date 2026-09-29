@@ -9,7 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,6 +31,13 @@ fun GuildScreen(
     onDiscardMission: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val guildLvl = gameState.buildings.find { it.id == "guild" }?.level ?: 1
+    var selectedMissionTab by remember { mutableStateOf(0) }
+    val missionTabs = when {
+        guildLvl >= 3 -> listOf("Coleta", "Caça", "Expedições")
+        guildLvl == 2 -> listOf("Coleta", "Caça")
+        else -> emptyList()
+    }
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -307,29 +314,102 @@ fun GuildScreen(
 
         // Seção: Quadro de Contratos (Missões)
         item {
-            Text(
-                text = "Quadro de Contratos",
-                color = GoldPrimary,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-            )
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Quadro de Contratos",
+                    color = GoldPrimary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                )
+
+                if (missionTabs.isNotEmpty()) {
+                    val currentTabIndex = selectedMissionTab.coerceIn(0, missionTabs.size - 1)
+                    TabRow(
+                        selectedTabIndex = currentTabIndex,
+                        containerColor = DarkSurface,
+                        contentColor = GoldPrimary,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                    ) {
+                        missionTabs.forEachIndexed { index, title ->
+                            Tab(
+                                selected = currentTabIndex == index,
+                                onClick = { selectedMissionTab = index },
+                                text = {
+                                    Text(
+                                        text = title,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (currentTabIndex == index) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (currentTabIndex == index) GoldPrimary else TextGray
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+            }
         }
 
-        val activeMissions = gameState.missions.filter { !it.isCompleted }
-        if (activeMissions.isEmpty()) {
+        val allActiveMissions = gameState.missions.filter { !it.isCompleted }
+        val currentTabName = if (missionTabs.isNotEmpty()) {
+            val safeIndex = selectedMissionTab.coerceIn(0, missionTabs.size - 1)
+            missionTabs[safeIndex]
+        } else null
+
+        val filteredMissions = when (currentTabName) {
+            "Coleta" -> allActiveMissions.filter { it.targetMonsterName.startsWith("Coleta") }
+            "Caça" -> allActiveMissions.filter { !it.targetMonsterName.startsWith("Coleta") }
+            "Expedições" -> emptyList()
+            else -> allActiveMissions
+        }
+
+        if (currentTabName == "Expedições") {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant),
+                    border = BorderStroke(1.dp, GoldDark.copy(alpha = 0.5f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "🗺️ Expedições de Longa Distância",
+                            color = GoldLight,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Os cartógrafos da guilda estão mapeando rotas para territórios inexplorados. Novos contratos de expedição em breve!",
+                            color = TextGray,
+                            fontSize = 12.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                }
+            }
+        } else if (filteredMissions.isEmpty()) {
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant)
                 ) {
                     Box(modifier = Modifier.padding(16.dp), contentAlignment = Alignment.Center) {
-                        Text(text = "Nenhum contrato disponível no momento.", color = TextGray, fontSize = 14.sp)
+                        Text(
+                            text = if (currentTabName != null) "Nenhum contrato de $currentTabName disponível no momento." else "Nenhum contrato disponível no momento.",
+                            color = TextGray,
+                            fontSize = 14.sp
+                        )
                     }
                 }
             }
         } else {
-            items(activeMissions) { mission ->
+            items(filteredMissions) { mission ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = DarkSurface),
