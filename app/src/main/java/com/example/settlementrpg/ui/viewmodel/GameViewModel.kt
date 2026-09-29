@@ -452,8 +452,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     }
                 } else {
-                    // Monstro sumiu/inválido
-                    updatedHeroes[i] = hero.copy(state = HeroState.IDLE, targetMonsterId = null)
+                    // Monstro sumiu ou é inválido (ex: respawn no mesmo tick que o herói chegou).
+                    // OBRIGATÓRIO: liberar a missão e zerar currentMissionId antes de voltar pra IDLE.
+                    // Sem isso: herói fica IDLE com currentMissionId != null, missão fica presa
+                    // com assignedHeroId = hero.id mesmo com herói vivo — bug do "Aceito por X" duplicado.
+                    if (hero.currentMissionId != null) {
+                        releaseMission(hero.currentMissionId)
+                    }
+                    updatedHeroes[i] = hero.copy(
+                        state = HeroState.IDLE,
+                        targetMonsterId = null,
+                        currentMissionId = null
+                    )
                 }
             }
         }
