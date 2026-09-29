@@ -507,13 +507,34 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             }
         }.toMutableList()
 
-        // 6. Atribuição de Missões automáticas para heróis IDLE
+        // 6. Limpar missões órfãs: assignedHeroId aponta para herói morto ou ausente.
+        //    Sem isso, a missão fica bloqueada para sempre após morte/crash do herói.
+        val activeHeroIds = updatedHeroes.filter { !it.isDead }.map { it.id }.toSet()
+        for (i in updatedMissions.indices) {
+            val m = updatedMissions[i]
+            val orphaned = m.assignedHeroId != null &&
+                           m.assignedHeroId !in activeHeroIds &&
+                           !m.isCompleted
+            if (orphaned) {
+                updatedMissions[i] = m.copy(assignedHeroId = null)
+                logsToAdd.add(LogMessage(
+                    id = UUID.randomUUID().toString(),
+                    text = "Contrato '${m.title}' liberado — herói responsável não está mais disponível.",
+                    timestamp = System.currentTimeMillis(),
+                    type = LogType.SYSTEM
+                ))
+            }
+        }
+
+        // 7. Atribuição de Missões automáticas para heróis IDLE sem contrato ativo.
+        //    Dupla trava: hero.state == IDLE  E  hero.currentMissionId == null.
+        //    Isso previne dupla atribuição em estados inconsistentes (ex: save-load corrompido).
         for (i in updatedHeroes.indices) {
             val hero = updatedHeroes[i]
-            if (hero.state == HeroState.IDLE) {
+            if (hero.state == HeroState.IDLE && hero.currentMissionId == null) {
                 val availableMission = updatedMissions.find { m ->
                     if (!m.isPublished || m.assignedHeroId != null || m.isCompleted) return@find false
-                    
+
                     // Trava de Ranks proporcional
                     val requiredRank = when (m.difficulty) {
                         3 -> "D" // Orc (Dificuldade 3) exige Rank D (Lvl 3+)
@@ -842,19 +863,26 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun discardMission(missionId: String) {
         val currentState = _gameState.value
         val mission = currentState.missions.find { it.id == missionId } ?: return
-        
-        if (mission.assignedHeroId == null && !mission.isCompleted) {
+        if (mission.isCompleted) return
+
+        // Permitir descarte se: sem herói atribuído OU o herói atribuído está morto/ausente (missão órfã).
+        val assignedHero = currentState.heroes.find { it.id == mission.assignedHeroId }
+        val isOrphan = mission.assignedHeroId != null && (assignedHero == null || assignedHero.isDead)
+        val canDiscard = mission.assignedHeroId == null || isOrphan
+
+        if (canDiscard) {
             val updatedMissionsList = currentState.missions.toMutableList()
             updatedMissionsList.remove(mission)
-            
+
             // Devolve o ouro caso já estivesse publicada
             val refundGold = if (mission.isPublished) mission.goldReward else 0
-            
+            val orphanNote = if (isOrphan) " (herói indisponível)" else ""
+
             _gameState.value = currentState.copy(
                 gold = currentState.gold + refundGold,
                 missions = updatedMissionsList
             )
-            addLog("Contrato: Missão '${mission.title}' descartada pelo administrador${if (refundGold > 0) " (+$refundGold 🪙 reembolsados)" else ""}.", LogType.SYSTEM)
+            addLog("Contrato: Missão '${mission.title}' descartada$orphanNote${if (refundGold > 0) " (+$refundGold 🪙 reembolsados)" else ""}.", LogType.SYSTEM)
             saveGame()
         }
     }

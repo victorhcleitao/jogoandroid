@@ -405,15 +405,52 @@ fun GuildScreen(
                             }
                         } else {
                             if (mission.assignedHeroId != null) {
-                                val heroName = gameState.heroes.find { it.id == mission.assignedHeroId }?.name ?: "Alguém"
-                                Box(
-                                    modifier = Modifier
-                                        .padding(top = 8.dp)
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .background(Color(0xFF2E3440))
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Text(text = "Aceito por: $heroName", color = GoldLight, fontSize = 11.sp)
+                                val assignedHero = gameState.heroes.find { it.id == mission.assignedHeroId }
+                                val isOrphan = assignedHero == null || assignedHero.isDead
+                                if (isOrphan) {
+                                    // Herói morto ou ausente — missão órfã, permite cancelar
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .background(Color(0xFF4A3000))
+                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                        ) {
+                                            Text(
+                                                text = "⚠ Herói indisponível",
+                                                color = Color(0xFFFFCC00),
+                                                fontSize = 11.sp
+                                            )
+                                        }
+                                        Button(
+                                            onClick = { onDiscardMission(mission.id) },
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                            shape = RoundedCornerShape(4.dp),
+                                            modifier = Modifier.height(24.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828), contentColor = Color.White)
+                                        ) {
+                                            Text(text = "Cancelar (Reembolsar)", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                } else {
+                                    // Herói ativo — contrato bloqueado, não pode cancelar
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(top = 8.dp)
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(Color(0xFF2E3440))
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = "Aceito por: ${assignedHero.name}",
+                                            color = GoldLight,
+                                            fontSize = 11.sp
+                                        )
+                                    }
                                 }
                             } else {
                                 Row(
